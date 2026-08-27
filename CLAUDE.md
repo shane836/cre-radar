@@ -76,8 +76,9 @@ it. The listing is the page; everything else is one click away.
   in `data-a` and the script rebuilds it; `tests/test_site.py` asserts no
   `user@host.tld` matches anywhere in the output. Do not "simplify" that into a
   plain `mailto:` — the page is indexed and harvested.
-- **Publish an alias, never `shane@masonequitypartners.com`.** An alias can be
-  switched off if it leaks; the primary work address cannot.
+- **Publish a forwarding alias, never the primary work address.** An alias can
+  be switched off the day it starts pulling spam; a primary address cannot.
+  (This file is public — that is why it names neither.)
 - **Empty link constants omit the link.** `LINKEDIN_URL`, `CONTACT_EMAIL` and
   `BEEHIIV_EMBED_URL` all default to `""` and the renderer skips them rather
   than emitting `href=""`. Do not add a placeholder value to "fix" a blank spot.
