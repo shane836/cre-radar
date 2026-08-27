@@ -1,0 +1,222 @@
+# LA commercial real estate & real estate investment event sources.
+#
+# mode              html | browser | rss | ical
+#   html            plain HTTP is enough
+#   browser         needs headless Chromium (JS calendar, or the host 403s)
+#   rss / ical      structured feed — parsed directly, no model call, no tokens
+#
+# verification_level  official | trusted_partner | community | unverified
+#   Decides who wins when two sources describe the same event. The hosting org's
+#   own page outranks an aggregator's write-up of it, which is usually the
+#   difference between a registration link and a paywalled news post. See
+#   src/cre_radar/persist.py.
+#
+# timezone          IANA zone used to interpret this source's wall-clock times.
+#   Correct for every LA-local source. For the two national bodies (ssa, icsc) it
+#   is a default that will be wrong for out-of-region events — a known limitation;
+#   the extracted `city` still comes through, and the scorer drops non-SoCal
+#   events on geography anyway.
+#
+# Every enabled URL returned usable content on 2026-08-26. Re-check with
+# `uv run cre-radar sources check --browser`.
+
+# --- The hosting organizations themselves (official) -------------------------
+
+[[source]]
+slug = "naiop-socal"
+org = "NAIOP SoCal"
+url = "https://naiopsocal.org/events/"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "crew-la"
+org = "CREW Los Angeles"
+url = "https://crewla.org/events/"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "usc-lusk"
+org = "USC Lusk Center for Real Estate"
+url = "https://lusk.usc.edu/events"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "aircre"
+org = "AIR CRE"
+url = "https://www.aircre.com/events/"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "irem-la"
+org = "IREM Greater Los Angeles"
+url = "https://www.iremla.org/events"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "aagla"
+org = "Apartment Association of Greater Los Angeles"
+url = "https://aagla.org/events/"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "cssa"
+org = "California Self Storage Association"
+url = "https://www.californiaselfstorage.org/events"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "ssa"
+org = "Self Storage Association"
+url = "https://www.selfstorage.org/education-events/"
+mode = "html"
+verification_level = "official"
+# ASP.NET WebForms: the whole body sits inside one <form>. Do not add "form" back
+# to fetch._STRIP_TAGS — it silently reduced this page to its <title>.
+
+[[source]]
+slug = "ccala"
+org = "Central City Association of Los Angeles"
+url = "https://www.ccala.org/events"
+mode = "html"
+verification_level = "official"
+
+[[source]]
+slug = "breaa"
+org = "Berkeley Real Estate Alumni Association"
+url = "https://www.berkeleyrealestate.org/events"
+mode = "html"
+verification_level = "official"
+# The LA chapter page (/LA-Events) is a Wild Apricot widget that never loads its
+# data under headless Chromium — requestStorageAccess denied, events XHR never
+# fires. The org-wide /events page is server-rendered and carries the same LA
+# listings. It also carries Bay Area and NYC events; the scorer drops those on
+# geography, which guarantees no LA event is missed.
+
+[[source]]
+slug = "boma-gla"
+org = "BOMA Greater Los Angeles"
+url = "https://infohub.bomagla.org/eventcalendar"
+mode = "browser"
+verification_level = "official"
+
+[[source]]
+slug = "icsc"
+org = "ICSC"
+url = "https://www.icsc.com/events"
+mode = "browser"
+verification_level = "official"
+timezone = "America/Los_Angeles"   # national body; see the timezone note above
+
+[[source]]
+slug = "usc-alumni"
+org = "USC Alumni Association"
+url = "https://alumni.usc.edu/events/"
+mode = "browser"
+linkless = true
+verification_level = "official"
+# Every card is plain text — even "View Details" is not an anchor — so the
+# link-based reader found nothing. `linkless` reads the date-block shape instead
+# and uses this page as each event's URL. Its RSS feed is news, not events.
+
+[[source]]
+slug = "haas-alumni"
+org = "Berkeley Haas Alumni"
+url = "https://haas.berkeley.edu/?post_type=tribe_events&feed=rss2"
+mode = "rss"
+verification_level = "official"
+# The Events Calendar (WordPress) exposes a real RSS feed. No scraping, no
+# extraction, no tokens — and it cannot break on a restyle. Worldwide calendar,
+# so most entries are other chapters; geography filters them.
+
+[[source]]
+slug = "ucla-anderson"
+org = "UCLA Anderson Alumni"
+url = "https://www.anderson.ucla.edu/alumni/events"
+mode = "html"
+linkless = true
+verification_level = "official"
+# Titles are plain text and the only link on each card is a Google Maps pin for
+# the venue, which the link reader kept mistaking for the event.
+
+# --- Platform listings, usually posted by the host org (trusted_partner) ------
+
+[[source]]
+slug = "eventbrite-la-re"
+org = "Eventbrite"
+url = "https://www.eventbrite.com/d/ca--los-angeles/real-estate-investing/"
+mode = "browser"
+verification_level = "trusted_partner"
+# 26% of all extraction input, and mostly the coaching-seminar content profile.md
+# rejects. The cheapest saving available is setting enabled = false here.
+
+[[source]]
+slug = "luma-la"
+org = "Luma — Los Angeles"
+url = "https://lu.ma/la"
+mode = "browser"
+verification_level = "trusted_partner"
+
+[[source]]
+slug = "luma-proptech"
+org = "Luma — PropTech & Hospitality Startups"
+url = "https://lu.ma/proptech"
+mode = "browser"
+verification_level = "trusted_partner"
+# A curated proptech calendar. lu.ma/real-estate is NOT a calendar — that slug
+# resolves to a single investing workshop, so it is deliberately not listed.
+
+# --- Editorial aggregators (community) ---------------------------------------
+# These write up other people's events. When they collide with an official
+# listing, the official one wins the row and these land in secondary_sources.
+
+[[source]]
+slug = "bisnow-la"
+org = "Bisnow"
+url = "https://www.bisnow.com/events?market=los-angeles"
+mode = "browser"
+verification_level = "community"
+
+[[source]]
+slug = "connect-cre"
+org = "Connect CRE"
+url = "https://www.connectcre.com/events/"
+mode = "browser"
+verification_level = "community"
+
+# --- Disabled: blocked, kept for a future retest -----------------------------
+
+[[source]]
+slug = "uli-la"
+org = "ULI Los Angeles"
+url = "PASTE_GOOGLE_ALERTS_RSS_URL_HERE"
+mode = "rss"
+enabled = false
+verification_level = "official"
+# la.uli.org 403s every path — plain HTTP, headless Chromium, and real Chrome
+# alike, with a Cloudflare challenge that does not clear. Search engines are
+# allowlisted; we are not. There is no scrape that gets in.
+#
+# The way through is a feed ULI cannot block. Create a Google Alert:
+#   1. google.com/alerts -> query:  site:la.uli.org/events
+#   2. Show options -> Deliver to: RSS feed
+#   3. Copy the feed URL into `url` above and set enabled = true
+#
+# `mode = "rss"` needs no new code — FeedAdapter already handles it, costs no
+# tokens, and cannot be blocked. Yield is lower than a scrape and it lags by a
+# day or so, which is the price of the only route that works.
+
+[[source]]
+slug = "labc"
+org = "Los Angeles Business Council"
+url = "https://labusinesscouncil.org/events/"
+mode = "browser"
+enabled = false
+verification_level = "community"
+# Hard 403 to real headless Chromium as well as to plain HTTP.

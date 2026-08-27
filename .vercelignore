@@ -1,0 +1,25 @@
+# Only the generated page ships. Everything below is how it gets built, and
+# leaving pyproject.toml in makes Vercel try to build a Python app.
+src/
+tests/
+fixtures/
+rubrics/
+scripts/
+docs/
+assets/
+pyproject.toml
+uv.lock
+.venv/
+*.db
+*.db.bak
+*.toml
+!vercel.json
+*.md
+.env
+.env.example
+cron.log
+
+# Local mockups. Never part of the deploy.
+*.jpg
+*.png
+navbar-*.html

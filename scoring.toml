@@ -1,0 +1,255 @@
+# Relevance rules. This file is the whole scorer — no model, no API, no judgment
+# call at runtime. Editing it is how you retune what reaches your digest.
+#
+# THE READER: a principal and capital allocator. He raises capital, buys assets,
+# and operates self-storage in LA. He is NOT a property manager, a small
+# landlord, or a building engineer.
+#
+# That distinction does almost all the work here. The LA calendar is dominated by
+# operator education — how to evict a tenant, how to pass a seismic inspection,
+# how to get an IREM certification — and none of it is for him. What is for him:
+# raising capital, deploying it, and the rooms where other principals are.
+#
+# An event starts at `base` and accumulates. Every rule that fires is recorded,
+# so the digest says *why* something scored what it did.
+# Final score is clamped 0-100. CRE_MIN_SCORE (default 55) is the cut line.
+
+base = 30
+
+# --- Who is hosting ----------------------------------------------------------
+# The single strongest signal. Principal-and-capital organizations versus
+# operator-and-vendor organizations. A social event at NAIOP is worth more than
+# a technical session at BOMA, because the room is different.
+[org]
+"California Self Storage Association" = 34
+"Self Storage Association" = 28
+"NAIOP SoCal" = 26
+"ULI Los Angeles" = 26
+"USC Lusk Center for Real Estate" = 26
+"AIR CRE" = 20
+"Berkeley Real Estate Alumni Association" = 16
+# General alumni calendars — mostly wine tastings, reunions and football. Their
+# real-estate programming is what's wanted, so the org alone must NOT clear the
+# floor: weighted so an event needs a capital or asset-class term to surface.
+# (BREAA is weighted higher above because every event it runs is real estate.)
+"USC Alumni Association" = 4
+"Berkeley Haas Alumni" = 4
+"UCLA Anderson Alumni" = 4
+"ICSC" = 12
+"Central City Association of Los Angeles" = 6
+"CREW Los Angeles" = 6
+"Connect CRE" = 4
+"Bisnow" = 16
+"Eventbrite" = 0
+"Luma — Los Angeles" = -10
+"Luma — PropTech & Hospitality Startups" = -10
+# Operator orgs. Their programming is trade education for people who manage
+# buildings for a living. Real organizations, wrong reader.
+"BOMA Greater Los Angeles" = -42
+"IREM Greater Los Angeles" = -42
+"Apartment Association of Greater Los Angeles" = -46
+
+# --- What it is about --------------------------------------------------------
+# Matched against title + description, case-insensitive. Each term fires once.
+[positive]
+# Capital — the thing he actually does.
+"raising" = 40
+"capital rais" = 44
+"fundrais" = 20
+"investing" = 34
+"investment" = 30
+"investor" = 30
+"limited partner" = 34
+"general partner" = 30
+"fund formation" = 34
+"private credit" = 26
+"capital markets" = 34
+"family office" = 30
+"syndicat" = 28
+"equity" = 22
+"debt market" = 24
+"lending" = 18
+"1031" = 26
+"cap rate" = 26
+"underwriting" = 26
+"acquisition" = 26
+"disposition" = 22
+"deal making" = 28
+"dealmaking" = 28
+"transaction" = 20
+"pipeline" = 14
+"distress" = 24
+"portfolio" = 16
+
+# Asset class.
+"self storage" = 38
+"self-storage" = 38
+"storage facility" = 30
+"industrial" = 16
+"land" = 10
+
+# Investor-community formats. Explicitly wanted: a room of people buying
+# property is worth being in whatever their scale, so the format earns points
+# rather than merely escaping a penalty.
+"meetup" = 12
+"meet up" = 12
+"investor network" = 12
+"rei" = 10
+"deal" = 10
+"multifamily" = 12
+"apartment" = 10
+"networking" = 6
+
+# Market intelligence worth an hour.
+"market outlook" = 28
+"state of the market" = 32
+"forecast" = 24
+"economic outlook" = 28
+"summit" = 26
+"conference" = 14
+"symposium" = 16
+"measure ula" = 22
+"entitlement" = 14
+
+# --- What it is not ----------------------------------------------------------
+# Operator education. This is the bulk of the LA calendar and none of it is his
+# job — he hires people for every one of these.
+[negative]
+"property management" = -60
+"property manager" = -60
+"training program" = -60
+"certification" = -55
+"certified" = -40
+"ethics" = -50
+"course" = -50
+"curriculum" = -50
+"capstone" = -50
+"bootcamp" = -45
+"forms library" = -60
+"rent stabilization" = -55
+"rent control" = -45
+"eviction" = -55
+"landlord" = -50
+"tenant dispute" = -55
+"rental arrears" = -60
+"debt collection" = -55
+"lease contract" = -45
+"notices" = -40
+"seismic" = -50
+"sustainability" = -45
+"building operations" = -50
+"fire & life safety" = -60
+"life safety" = -55
+"emergency preparedness" = -55
+"security and" = -45
+"policy briefing" = -50
+"codes and regulations" = -50
+"bids and local" = -50
+"janitorial" = -60
+"maintenance" = -50
+"leadership pathways" = -50
+# CSSA runs two kinds of programming. Its networking is the reason it ranks
+# highest of any org here; its legal-compliance series is operator education and
+# is not wanted, however on-asset-class it looks.
+"lien law" = -65
+"default remedy" = -65
+"non-monetary" = -65
+"enforcing the" = -60
+"legal update" = -50
+"compliance" = -55
+
+"medicare" = -70
+"health insurance" = -60
+"retirement planning" = -55
+
+# Sales pitches wearing an event's clothes.
+"coaching" = -75
+"mastermind" = -75
+"get started investing" = -75
+"financial freedom" = -70
+"passive income" = -70
+"wealth building" = -70
+"how to make your money" = -75
+"free workshop" = -55
+"become a sponsor" = -70
+"sponsorship" = -60
+"more info ►" = -60
+"student" = -45
+"scholarship" = -50
+"job fair" = -55
+"career fair" = -55
+"volunteer" = -45
+"accepting applications" = -60
+"ross program" = -60
+"spotlight" = -55
+"business partner" = -50
+"vendor" = -50
+
+# Amateur investor meetups are welcome — a room full of people buying property
+# is a room worth being in, whatever their scale. The line is drawn at the sales
+# funnel, not at the size of the buyer: what gets rejected below is the pitch
+# ("no money down", "financial freedom"), not the format.
+"no money down" = -80
+"creative financing" = -60
+
+# Out-of-market chapters of statewide and national bodies. These name themselves
+# in the title long before a city field ever does.
+"norcal" = -70
+"northern california" = -70
+"bay area" = -65
+"san francisco" = -65
+"sacramento" = -65
+"oakland" = -65
+"san jose" = -65
+"nyc" = -65
+"new york" = -65
+"dubai" = -70
+"chicago" = -60
+# Bisnow's LA feed carries its national calendar too. These scope words are the
+# tell, and they appear in the title long before any city field does.
+"national" = -60
+"international" = -60
+"central region" = -70
+"east coast" = -65
+"west coast" = -35
+"mid-atlantic" = -70
+"midwest" = -70
+
+# Asset classes that are not his. Bisnow runs a lot of these and they score well
+# on the capital vocabulary otherwise.
+"data center" = -70
+"data centre" = -70
+"life science" = -70
+"biotech" = -70
+"healthcare real estate" = -60
+"senior housing" = -55
+"student housing" = -55
+"hotel" = -50
+"hospitality" = -50
+"affordable housing" = -40
+"adaptive reuse" = -30
+
+# --- Where it is -------------------------------------------------------------
+[geography]
+socal = 14
+online = 4
+elsewhere = -45
+unknown = 0
+
+socal_cities = [
+  "los angeles", "santa monica", "culver city", "pasadena", "burbank",
+  "glendale", "long beach", "torrance", "el segundo", "inglewood", "hawthorne",
+  "beverly hills", "west hollywood", "downtown la", "dtla", "century city",
+  "irvine", "orange county", "costa mesa", "anaheim", "newport beach",
+  "san diego", "riverside", "san bernardino", "ontario", "ventura", "socal",
+  "southern california",
+]
+
+# --- What kind of event ------------------------------------------------------
+# Deliberately flat. Where the room is matters far more than what the format is:
+# a holiday party at NAIOP beats a technical panel at BOMA.
+[category]
+conference = 10
+panel = 4
+networking = 4
+webinar = 0
