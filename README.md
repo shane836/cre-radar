@@ -9,6 +9,16 @@ ways: a **live site**, an email, and a dated Obsidian note.
 **No API key. No model. No per-run cost.** Everything is deterministic scripts —
 the same inputs always produce the same digest.
 
+## How this was built
+
+Written with Claude Code, reviewed and directed by me. The design decisions are
+mine — the rules-file scorer, the principal-not-operator filter that does most
+of the work, the adapter contract, and the choice to keep a model out of the
+runtime entirely. Most of the code implementing them is AI-generated.
+
+Worth stating plainly given the line above: *no model runs when this runs.* One
+was used to write it; none is used to operate it.
+
 ## How it works
 
 ```
