@@ -115,6 +115,21 @@ def digest_cmd(
     db.mark_surfaced(conn, "events", [row["id"] for row in pending])
 
 
+def _page_is_live(body: str) -> bool:
+    """Is this response the actual listing, rather than an error page?
+
+    Deliberately checks for the page's own furniture, not just a 200. Vercel's
+    404 is a 200-shaped HTML document from the same host, and a deployment that
+    ships the function without the static output serves exactly that.
+    """
+    from . import APP_NAME
+
+    titled = f"<title>{APP_NAME}</title>" in body
+    # Either a week of events, or the honest "nothing cleared the floor" note.
+    # Both are the page working; only neither means it is not there.
+    return titled and ('class="week"' in body or 'class="empty"' in body)
+
+
 @app.command("publish")
 def publish_cmd(
     deploy: bool = typer.Option(
@@ -160,18 +175,28 @@ def publish_cmd(
     # Both run from the repo root, not `public/`: the root carries vercel.json
     # (which turns framework detection off) and the project link.
     target = ["--prod"] if prod else []
-    build = subprocess.run(
-        ["vercel", "build", "--yes", *target],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
-    )
+
+    def _vercel(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["vercel", *args], cwd=REPO_ROOT,
+            capture_output=True, text=True, check=False,
+        )
+
+    build = _vercel("build", "--yes", *target)
     if build.returncode != 0:
         _echo_bad(build.stderr.strip() or "vercel build failed")
         raise typer.Exit(1)
 
-    command = ["vercel", "deploy", "--prebuilt", "--yes", *target]
-    result = subprocess.run(
-        command, cwd=REPO_ROOT, capture_output=True, text=True, check=False
-    )
+    # Retried once. The 07:00 run on 2026-08-31 failed here with a bare
+    # "Error: Not authorized" that never reproduced — not in the same stripped
+    # environment launchd uses, not since. An unattended daily job should
+    # survive one transient refusal rather than skip a day's publish over it.
+    result = _vercel("deploy", "--prebuilt", "--yes", *target)
+    if result.returncode != 0:
+        first = result.stderr.strip()
+        result = _vercel("deploy", "--prebuilt", "--yes", *target)
+        if result.returncode == 0:
+            _echo_bad(f"deploy retried after: {first}")
     if result.returncode != 0:
         _echo_bad(result.stderr.strip() or "vercel deploy failed")
         raise typer.Exit(1)
@@ -179,6 +204,30 @@ def publish_cmd(
     # the only line that is actually useful here.
     urls = re.findall(r"https://[\w.-]+\.vercel\.app", result.stdout + result.stderr)
     _echo_ok(f"deployed: {urls[-1] if urls else 'ok'}")
+
+    # A deploy can succeed and still leave the site down. On 2026-08-30 a plain
+    # `vercel deploy` shipped `api/subscribe` and zero static files, and Vercel
+    # reported it Ready and aliased it — the page 404'd for eleven hours and
+    # nothing in this pipeline noticed. Exit codes are not evidence the site
+    # works; the site is.
+    if prod:
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(site.SITE_URL, timeout=20) as response:
+                body = response.read().decode("utf-8", "replace")
+        except Exception as error:
+            _echo_bad(f"deployed, but {site.SITE_URL} did not answer: {error}")
+            raise typer.Exit(1) from error
+
+        if not _page_is_live(body):
+            _echo_bad(
+                f"deployed, but {site.SITE_URL} is not serving the page. "
+                "The deployment most likely shipped the function without the "
+                "static output."
+            )
+            raise typer.Exit(1)
+        _echo_ok(f"verified live: {site.SITE_URL}")
 
 
 @app.command("run")

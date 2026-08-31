@@ -305,3 +305,26 @@ def test_renaming_the_product_does_not_rename_the_command(monkeypatch):
     assert "CRE Events Radar" not in page
     assert page.count("Renamed Thing") == 3      # title, brand, json-ld
     assert "cre-radar" in page                   # the footer credit stands
+
+
+# --- A deploy that "succeeds" can still leave the site down -----------------
+
+def test_liveness_check_accepts_the_real_page(page):
+    """The listing, with or without events, is the site working."""
+    from cre_radar.cli import _page_is_live
+
+    assert _page_is_live(page)
+    empty = site.render([], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC))
+    assert _page_is_live(empty)          # "nothing cleared the floor" counts
+
+
+def test_liveness_check_rejects_a_function_only_deploy(page):
+    """On 2026-08-30 a plain `vercel deploy` shipped api/subscribe and zero
+    static files. Vercel reported it Ready and aliased it; the page 404'd for
+    eleven hours. Exit codes are not evidence the site works."""
+    from cre_radar.cli import _page_is_live
+
+    assert not _page_is_live("The page could not be found\n\nNOT_FOUND\n")
+    assert not _page_is_live("")
+    # A 200-shaped error page from the same host must not pass either.
+    assert not _page_is_live("<html><title>404</title><body>Not found</body></html>")

@@ -151,6 +151,26 @@ a different thing entirely.
 omit the link, because a wrong link here puts an events reader on the firm's
 investor list. Fill them with cre-radar's own hosted page or leave them blank.
 
+## Publishing
+
+**Never a bare `vercel deploy`.** It uploads the sources and builds them
+remotely, and the upload skips gitignored paths — `public/` is generated and
+therefore gitignored, so the page never reaches the builder. The deployment
+comes out with `api/subscribe` and no static files, Vercel marks it Ready and
+aliases it, and the site 404s. That happened on 2026-08-30 and the page was
+down for eleven hours. `publish --deploy` runs `vercel build` locally and ships
+it with `--prebuilt`.
+
+**A green exit code is not evidence the site works.** `publish --deploy` fetches
+`SITE_URL` afterwards and checks for the page's own furniture — the title plus
+either a week block or the empty-state note. Vercel's 404 is an HTML document
+served from the same host, so a status code alone proves nothing.
+
+**The deploy is retried once.** The 07:00 run on 2026-08-31 failed with a bare
+"Error: Not authorized" that has never reproduced — not under the same stripped
+environment launchd uses, not since. One transient refusal should not cost a
+day's publish.
+
 ## The daily run
 
 **launchd, not cron.** `scripts/install-launchd.sh` writes
