@@ -81,13 +81,37 @@ base64'd and the script rebuilds it on load, so a harvester scanning for
 `user@host.tld` finds nothing; readers without JS get `name at host dot com`.
 Publish a forwarding alias here, not the primary work address.
 
-Signups go to the **one** beehiiv audience the firm's site feeds, tagged
-`utm_medium=cre-radar`. There is deliberately no subscriber table in this repo.
-By default the block is a button, which keeps the page's zero-external-requests
-property; set `BEEHIIV_EMBED_URL` in `site.py` for an inline form instead.
+The mailing-list block is a field and a **Subscribe** button. It posts to
+`api/subscribe.js` on this same site, which creates the subscription on
+cre-radar's **own beehiiv publication** through beehiiv's v2 API, tagged
+`utm_medium=cre-radar`. Nothing is stored in this repo — beehiiv is the list.
 
-The three link constants at the top of `site.py` — `LINKEDIN_URL`,
-`CONTACT_EMAIL`, `BEEHIIV_EMBED_URL` — each omit their link when left empty.
+Its own publication, rather than the firm's `Website - Spec Contact & Insights`
+audience: this digest has a different cadence and its own reason to
+unsubscribe, and mixing the two would cost the firm's list a subscriber every
+time someone tires of the events.
+
+Posting same-origin keeps the page's zero-external-requests property. Without
+JavaScript the form is a plain POST and the function answers with a page.
+Setting `BEEHIIV_EMBED_URL` in `site.py` swaps the whole block for beehiiv's
+own embedded iframe instead — an escape hatch, and the one thing that gives up
+the zero-external-requests property.
+
+Set these on the **Vercel project**, not in `.env` (which is never deployed):
+
+| Variable | |
+|---|---|
+| `BEEHIIV_API_KEY` | required. beehiiv → Settings → API. |
+| `BEEHIIV_PUBLICATION_ID` | required. The cre-radar publication, `pub_…`. |
+| `BEEHIIV_SUBSCRIBE_URL` | optional. The publication's hosted signup page, where a failed signup is sent. Also set `SUBSCRIBE_URL` in `site.py` so the script offers the same link. |
+| `RESEND_API_KEY`, `SUBSCRIBE_TO` | optional. Emails a copy of each signup to the radar alias. Best-effort: a mail failure never fails a signup beehiiv already accepted. |
+
+Missing either required variable logs the names and returns a 500 rather than
+showing a thank-you for a signup nobody received.
+
+The four link constants at the top of `site.py` — `LINKEDIN_URL`,
+`CONTACT_EMAIL`, `BEEHIIV_EMBED_URL`, `SUBSCRIBE_URL` — each omit their link
+when left empty, rather than shipping a dead or wrong one.
 
 ## Setup
 
@@ -134,7 +158,9 @@ tail -f cron.log                 # watch
 ## The site
 
 `publish` renders `public/index.html` — one self-contained file, no build step, no
-framework, no external requests. Vercel serves it as a static site.
+framework, no external requests. Vercel serves it as a static site, alongside a
+single function at `api/subscribe.js` (the signup box, and the only server-side
+code in the project).
 
 It answers a different question from the email. The digest asks "what haven't I
 told you yet"; the page asks "what is coming up", so events stay listed until
@@ -143,7 +169,8 @@ and follows your system light/dark setting.
 
 Deploy config lives in `vercel.json` (framework detection **off** — otherwise
 Vercel sees `pyproject.toml` and tries to build a Python app) and `.vercelignore`
-(only the generated page ships; the extractor never leaves your machine).
+(only the generated page and `api/` ship; the extractor never leaves your
+machine).
 
 ```bash
 vercel login                        # once

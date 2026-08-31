@@ -181,10 +181,65 @@ def test_empty_constants_render_no_link_at_all(monkeypatch):
 
 # --- One list, tagged by source ---------------------------------------------
 
-def test_subscribe_points_at_the_one_beehiiv_audience_and_is_tagged(page):
-    """`Website - Spec Contact & Insights` in the vault: never a second list."""
-    assert "masonequitypartners.beehiiv.com/subscribe" in page
+def test_signup_posts_to_this_site_not_a_third_party(page):
+    """Same-origin, so the page still makes zero external requests on load and
+    the address goes to the radar alias rather than a form service."""
+    assert '<form class="join" id="joinForm" method="post" action="/api/subscribe"' in page
+    assert 'name="email" type="email"' in page
+    assert ">Subscribe</button>" in page
+
+
+def test_the_field_has_a_real_label(page):
+    """A placeholder disappears the moment anyone types and is not required to
+    be announced at all."""
+    assert '<label class="sr" for="joinEmail">Email address</label>' in page
+    assert 'id="joinEmail"' in page
+
+
+def test_the_honeypot_is_hidden_from_people_but_present_for_bots(page):
+    assert 'name="company"' in page
+    assert 'tabindex="-1"' in page
+    assert '<div class="hp" aria-hidden="true">' in page
+    # display:none would let a bot skip it, which defeats the point.
+    trap = page.split(".hp{")[1].split("}")[0]
+    assert "left:-9999px" in trap and "display:none" not in trap
+
+
+def test_the_result_message_is_a_live_region_that_ships_empty(page):
+    """Injecting the element with the message gives a screen reader nothing to
+    announce — the region has to already be there."""
+    assert '<p class="note" id="joinNote" role="status"></p>' in page
+
+
+def test_the_hosted_page_is_the_failure_route_only(monkeypatch):
+    """The publication's own signup page is where a broken function sends
+    people — not the first thing the page asks them to click."""
+    monkeypatch.setattr(site, "SUBSCRIBE_URL", "https://cre-radar.beehiiv.com/subscribe")
+    page = site.render(
+        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC), source_count=20
+    )
+
+    assert page.count("cre-radar.beehiiv.com") == 1
+    assert "Subscribe here instead" in page
     assert "utm_medium=cre-radar" in page
+    # Entities are not decoded inside <script>: `&amp;` here ships literally
+    # and beehiiv reads the tag as `amp;utm_medium`.
+    assert "&amp;utm_medium" not in page
+
+
+def test_an_unset_hosted_page_omits_the_fallback_link(page):
+    """Same rule as every other link constant: omit it, never ship a dead one.
+    The failure message still shows; only the link goes."""
+    assert "Subscribe here instead" not in page
+    assert "beehiiv.com" not in page
+    assert "Could not reach the server." in page   # the message survives
+
+
+def test_the_button_never_hardcodes_white_on_accent(page):
+    """`--accent` inverts in dark mode: white on the light blue is 2.5:1."""
+    filled = page.split(".join .cta{")[1].split("}")[0]
+    assert "color:var(--on-accent)" in filled
+    assert "#fff" not in filled
 
 
 def test_drawer_bodies_are_not_left_in_the_page_flow(page):
@@ -200,14 +255,14 @@ def test_subscribe_uses_the_sites_own_copy(page):
     assert "No spam. Unsubscribe anytime." in page
 
 
-def test_button_until_an_embed_is_configured(page):
+def test_own_form_until_an_embed_is_configured(page):
     """No embed set means no iframe, which means the page still loads without
     making a single external request."""
     assert "<iframe" not in page
-    assert "Sign me up" in page
+    assert 'id="joinForm"' in page
 
 
-def test_embed_replaces_the_button_when_configured(monkeypatch):
+def test_embed_replaces_the_form_when_configured(monkeypatch):
     monkeypatch.setattr(site, "BEEHIIV_EMBED_URL", "https://embeds.beehiiv.com/abc")
     page = site.render(
         [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC), source_count=20
@@ -215,4 +270,4 @@ def test_embed_replaces_the_button_when_configured(monkeypatch):
 
     assert '<iframe class="embed" src="https://embeds.beehiiv.com/abc"' in page
     assert 'title="Subscribe to the newsletter"' in page   # the a11y name
-    assert "Sign me up" not in page
+    assert 'id="joinForm"' not in page

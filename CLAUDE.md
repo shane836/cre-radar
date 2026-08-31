@@ -89,29 +89,60 @@ it. The listing is the page; everything else is one click away.
 blue is 6.9:1, but white on the light blue is **2.5:1**, a WCAG failure. Any new
 accent-filled control uses `var(--on-accent)` for its text, never `#fff`.
 
-## The mailing list is not this project's
+## The mailing list
 
-**One beehiiv audience, tagged by source.** `Website - Spec Contact & Insights`
-in the vault is explicit: never run a second list. cre-radar signups are
-`utm_medium=cre-radar` against the same publication the firm's site feeds.
-Do not add a subscribers table here.
+**cre-radar has its own beehiiv publication.** That reverses the earlier rule —
+`Website - Spec Contact & Insights` in the vault said never run a second list,
+and for a while cre-radar signups were tagged against the firm's audience.
+Shane's call, Aug 2026: this digest has its own cadence and its own reason to
+unsubscribe, and one list would cost the firm a subscriber every time someone
+tires of the events. Signups still carry `utm_medium=cre-radar`, so the two
+stay separable inside beehiiv.
 
-The block is a button by default, which is why the page still makes **zero
-external requests**. Setting `BEEHIIV_EMBED_URL` trades that for an inline
-form — a deliberate exception, not an oversight, and the only one.
+**Still no subscribers table here.** beehiiv is the list; this repo stores
+nothing. Do not add one.
 
-Do not try to post directly to beehiiv: `/create` needs a per-session
+The block is a field and a Subscribe button posting to `api/subscribe.js` on
+this same origin, which is why the page still makes **zero external requests**.
+Setting `BEEHIIV_EMBED_URL` trades that for beehiiv's iframe — a deliberate
+escape hatch, not an oversight, and the only one.
+
+`api/subscribe.js` creates the subscription through beehiiv's **v2 API**. Do
+not try to post to the hosted page instead: `/create` needs a per-session
 `visit_token` a static page cannot mint, and `/subscribe?email=` does not
-prefill, so a hand-rolled field makes the visitor type the address twice.
-Both verified against the live page, Aug 2026.
+prefill, so a hand-rolled field posting there makes the visitor type the
+address twice. Both verified against the live page, Aug 2026. The hosted page
+stays in the code as the *failure* route only.
+
+Four things in that function are load-bearing:
+
+- **A missing env var is a 500, never a thank-you.** `BEEHIIV_API_KEY` and
+  `BEEHIIV_PUBLICATION_ID` live in the **Vercel** project env, not the local
+  `.env`, which is not deployed. Swallowing the miss would drop real signups
+  behind a message the visitor believes.
+- **The Resend receipt is best-effort and must stay that way.** beehiiv already
+  has the subscriber by the time it runs; a mail failure is logged, never
+  surfaced. Turning it into an error would report a successful signup as a
+  failure.
+- **The plain form POST has to keep working.** No JavaScript means a real
+  navigation to `/api/subscribe`, so the function answers `text/html` unless
+  the caller sent `X-Requested-With: fetch`.
+- **The `company` field is a honeypot**, positioned off-screen rather than
+  `display:none` — a bot that skips hidden inputs walks past the trap. A filled
+  one gets a cheerful 200 and no subscription.
+
+**Never let the fallback point at the firm's publication.** `SUBSCRIBE_URL` in
+`site.py` and `BEEHIIV_SUBSCRIBE_URL` in the function both default to empty and
+omit the link, because a wrong link here puts an events reader on the firm's
+investor list. Fill them with cre-radar's own hosted page or leave them blank.
 
 ## Vercel
 
 `vercel.json` sets `framework: null` and `buildCommand: ""` deliberately — with
 detection on, Vercel finds `pyproject.toml` and fails with "No python entrypoint
-found". `.vercelignore` keeps everything but `public/` off the deployment. Deploy
-from the repo root, never from `public/` (that creates a second project named
-"public").
+found". `.vercelignore` keeps everything but `public/` and `api/` off the
+deployment. Deploy from the repo root, never from `public/` (that creates a
+second project named "public").
 
 ## Who this is for
 

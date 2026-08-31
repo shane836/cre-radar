@@ -66,6 +66,7 @@ half-judged database.
 | `scripts/` | `rebuild.sh` (drop and re-extract after an extraction change), `install-cron.sh` (the daily 07:00 entry). |
 | `assets/` | the firm's mark, light and dark. Inlined as base64 at render time — never deployed. |
 | `public/` | generated output. `index.html` is written by `publish` and served by Vercel. Never edit by hand; it is gitignored. |
+| `api/` | the one serverless function: `subscribe.js` takes the signup box's address and creates the subscription on cre-radar's beehiiv publication. Node, no dependencies, stores nothing. The only server-side code in the project. |
 
 Top-level files:
 
@@ -75,7 +76,7 @@ Top-level files:
 | `scoring.toml` | **is** the scorer. Base score plus weights for org, subject, geography, kind. |
 | `.env` | secrets and per-machine paths. Never committed; `.env.example` carries blank placeholders. |
 | `vercel.json` | `framework: null` and an empty `buildCommand`, deliberately — with detection on, Vercel finds `pyproject.toml` and fails. |
-| `.vercelignore` | only `public/` ships. The extractor and the database never leave the machine. |
+| `.vercelignore` | only `public/` and `api/` ship. The extractor and the database never leave the machine. |
 | `cre_radar.db` | the SQLite store. Gitignored; `rebuild.sh` keeps a `.bak`. |
 
 ## Module map
@@ -225,11 +226,16 @@ working.
 
 ## Deployment
 
-Only `public/index.html` deploys. `vercel.json` disables framework detection —
-with it on, Vercel finds `pyproject.toml` and fails with "No python entrypoint
-found" — and `.vercelignore` keeps everything but the generated page out. Deploy
-from the repo root; deploying from `public/` creates a second Vercel project
-named "public".
+Only `public/index.html` and `api/subscribe.js` deploy. `vercel.json` disables
+framework detection — with it on, Vercel finds `pyproject.toml` and fails with
+"No python entrypoint found" — and `.vercelignore` keeps everything else out.
+Deploy from the repo root; deploying from `public/` creates a second Vercel
+project named "public".
+
+`api/subscribe.js` reads `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` from
+the Vercel project's environment, plus optional `BEEHIIV_SUBSCRIBE_URL` and
+Resend variables for the signup receipt. The local `.env` is not deployed, so
+setting them there does nothing for the live signup box.
 
 The collector, the database and the vault note never leave the machine that runs
 the cron job.

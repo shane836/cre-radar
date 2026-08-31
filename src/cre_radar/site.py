@@ -55,23 +55,38 @@ LINKEDIN_URL = "https://www.linkedin.com/in/masonshane/"
 CONTACT_EMAIL = "radar@masonequitypartners.com"
 
 # --- Mailing list ------------------------------------------------------------
-# One beehiiv audience, tagged by source. `Website - Spec Contact & Insights`
-# in the vault is explicit about this: never run a second list. `utm_medium`
-# is the placement, matching the site's own footer / cta-band / contact /
-# invest tags, so cre-radar signups are separable in beehiiv without being a
-# separate audience.
+# cre-radar has its own beehiiv publication. That is a change from how this
+# started — the firm's `Website - Spec Contact & Insights` audience was the
+# only list, tagged by source — and it is deliberate: this digest has its own
+# cadence and its own reason to unsubscribe, and mixing the two costs the
+# firm's list every time someone tires of the events. The `utm_medium` tag is
+# kept anyway, so the two are still separable inside beehiiv.
+#
+# The box posts the address to `api/subscribe.js`, which creates the
+# subscription through beehiiv's v2 API. Nothing is stored in this repo;
+# beehiiv is the list.
 
-SUBSCRIBE_URL = "https://masonequitypartners.beehiiv.com/subscribe"
+SUBSCRIBE_ENDPOINT = "/api/subscribe"
+# The publication's own hosted subscribe page — where the script sends anyone
+# whose signup errored, so a broken function never costs the visitor the
+# signup. Empty until the publication exists, and the renderer omits the link
+# rather than shipping a dead one. `api/subscribe.js` reads the same URL from
+# `BEEHIIV_SUBSCRIBE_URL` for its no-JavaScript error page.
+SUBSCRIBE_URL = ""
 SUBSCRIBE_UTM = "utm_source=cre-radar.vercel.app&utm_medium=cre-radar"
 
 # beehiiv's own embed (Settings -> Subscribe Forms -> Embed), e.g.
-# "https://embeds.beehiiv.com/<uuid>". Set this and the block becomes an inline
-# form; leave it empty and it stays a button to the hosted subscribe page.
+# "https://embeds.beehiiv.com/<uuid>". Set this and the block becomes beehiiv's
+# iframe instead of this site's own field and button — an escape hatch, not the
+# default: it costs the page its zero-external-requests property and hands the
+# styling to beehiiv.
 #
-# Why an embed and not a form posting straight to beehiiv: their `/create`
-# endpoint requires a per-session `visit_token` that a static page cannot mint,
-# and `/subscribe?email=` does not prefill, so a hand-rolled field would make
-# the visitor type the address twice. Verified against the live page, Aug 2026.
+# Why the site's own field posts to a function rather than straight to beehiiv:
+# their `/create` endpoint requires a per-session `visit_token` that a static
+# page cannot mint, and `/subscribe?email=` does not prefill, so a hand-rolled
+# field posting there would make the visitor type the address twice. Verified
+# against the live page, Aug 2026. The v2 API has no such constraint, which is
+# what `api/subscribe.js` uses.
 BEEHIIV_EMBED_URL = ""
 
 
@@ -216,12 +231,36 @@ def _nav() -> str:
     )
 
 
+def _fallback_link_js() -> str:
+    """The "subscribe here instead" node, or nothing.
+
+    Lives outside `render`'s f-string so the URL is not brace-doubled and the
+    empty case is a plain early return rather than a conditional inside the
+    template. Emitted raw, not `_esc`'d: HTML entities are not decoded inside
+    `<script>`, so escaping the `&` would ship a literal `&amp;` and break the
+    query string.
+    """
+    if not SUBSCRIBE_URL:
+        return ""
+    return f"""      const link = document.createElement('a');
+      link.href = '{SUBSCRIBE_URL}?{SUBSCRIBE_UTM}';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = 'Subscribe here instead';
+      note.append(' ', link, '.');"""
+
+
 def _subscribe() -> str:
     """The mailing-list block. Copy is the site's, so the two read as one voice.
 
-    Degrades on purpose: with no embed configured this is a button and the page
-    still makes zero external requests, which is the property the rest of this
-    file works to preserve. The embed trades that for inline completion.
+    One field and one button: a link to a hosted signup page loses people at
+    every step of the handoff, and the address is the only thing being asked
+    for. It posts to this site's own function, so the page still makes zero
+    external requests — the property the rest of this file works to preserve.
+
+    Degrades in both directions. Without JavaScript the form is a plain POST
+    and the function answers with a page; with an embed configured the whole
+    block becomes beehiiv's own form instead.
     """
     if BEEHIIV_EMBED_URL:
         action = (
@@ -230,10 +269,26 @@ def _subscribe() -> str:
             'scrolling="no" frameborder="0"></iframe>'
         )
     else:
-        href = f"{SUBSCRIBE_URL}?{SUBSCRIBE_UTM}"
         action = (
-            f'<p class="links"><a class="cta" href="{_esc(href)}" '
-            'target="_blank" rel="noopener">Sign me up &rarr;</a></p>'
+            f'<form class="join" id="joinForm" method="post" '
+            f'action="{_esc(SUBSCRIBE_ENDPOINT)}">'
+            # A placeholder is not a label — it vanishes the moment anyone
+            # types, and a screen reader is not required to announce it.
+            '<label class="sr" for="joinEmail">Email address</label>'
+            '<input class="field" id="joinEmail" name="email" type="email" '
+            'required autocomplete="email" spellcheck="false" '
+            'placeholder="your email address">'
+            # Honeypot. Bots fill every field they find; a person never reaches
+            # this one. The function treats a filled `company` as spam.
+            '<div class="hp" aria-hidden="true">'
+            '<label for="joinCompany">Company</label>'
+            '<input id="joinCompany" name="company" type="text" tabindex="-1" '
+            'autocomplete="off"></div>'
+            '<button class="cta" type="submit">Subscribe</button>'
+            "</form>"
+            # Empty and live: injecting the element along with the message
+            # would give a screen reader nothing to announce.
+            '<p class="note" id="joinNote" role="status"></p>'
         )
 
     return _drawer(
@@ -432,9 +487,31 @@ h1{{font-size:24px;letter-spacing:-.01em;margin-bottom:4px}}
    Kept at full --ink: --dim on --head is 3.8:1 in light mode, and this is the
    state a reader with JS disabled is stuck with. Only the cursor differs. */
 .mail:not([href]){{cursor:text}}
-.join .cta{{background:var(--accent);border-color:var(--accent);
-  color:var(--on-accent);font-weight:600}}
-.join .cta:hover{{opacity:.9;color:var(--on-accent)}}
+/* One row: field takes the slack, button keeps its label on one line. Both
+   wrap to their own line below ~380px rather than squeezing the field to
+   nothing. */
+.join{{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}}
+.field{{flex:1 1 190px;min-width:0;background:var(--card);color:var(--ink);
+  border:1px solid var(--line);border-radius:999px;padding:8px 15px;
+  font-family:inherit;font-size:13.5px}}
+.field::placeholder{{color:var(--dim)}}
+.field:focus-visible{{outline:2px solid var(--accent);outline-offset:1px;
+  border-color:var(--accent)}}
+/* `--on-accent`, never #fff: --accent inverts in dark mode and white on the
+   light blue is 2.5:1. */
+.join .cta{{background:var(--accent);border:1px solid var(--accent);
+  color:var(--on-accent);font-weight:600;font-family:inherit;font-size:13.5px;
+  border-radius:999px;padding:8px 18px;cursor:pointer;white-space:nowrap}}
+.join .cta:hover{{opacity:.9}}
+.join .cta[disabled]{{opacity:.55;cursor:default}}
+/* Off-screen rather than display:none — a bot that skips hidden inputs walks
+   past the trap. `tabindex=-1` and `aria-hidden` keep people out of it. */
+.hp{{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}}
+.sr{{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}}
+.note{{font-size:12.5px;color:var(--dim);margin-top:10px}}
+.note:empty{{display:none}}
+.note.bad{{color:var(--ink);font-weight:600}}
 .fine{{font-size:12px;color:var(--dim);margin-top:11px}}
 .embed{{width:100%;border:0;margin-top:13px;min-height:64px;
   color-scheme:light dark}}
@@ -494,6 +571,59 @@ document.addEventListener('keydown', e => {{ if (e.key === 'Escape') closeAll();
 const wanted = location.hash.replace('#', '');
 if (wanted === 'about' || wanted === 'subscribe') {{
   document.querySelector(`[data-drawer="${{wanted}}Drawer"]`)?.click();
+}}
+
+// Subscribe without leaving the listing. The form works as a plain POST too —
+// this only upgrades it to stay on the page, so a script that never loads
+// costs nothing but the reload.
+const joinForm = document.getElementById('joinForm');
+if (joinForm) {{
+  const note = document.getElementById('joinNote');
+  const button = joinForm.querySelector('button');
+  const idle = button.textContent;
+
+  function say(message, bad, withFallback) {{
+    note.className = bad ? 'note bad' : 'note';
+    // textContent, never innerHTML: the message crosses the wire.
+    note.textContent = message;
+    if (withFallback) {{
+{_fallback_link_js()}
+    }}
+  }}
+
+  joinForm.addEventListener('submit', async event => {{
+    event.preventDefault();
+    if (!joinForm.reportValidity()) return;
+    say('');
+    button.disabled = true;
+    button.textContent = 'Sending';
+    try {{
+      const answer = await fetch(joinForm.action, {{
+        method: 'POST',
+        headers: {{
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          // What tells the function to answer with JSON rather than a page.
+          'X-Requested-With': 'fetch'
+        }},
+        body: JSON.stringify(Object.fromEntries(new FormData(joinForm)))
+      }});
+      const data = await answer.json().catch(() => ({{}}));
+      if (answer.ok) {{
+        joinForm.reset();
+        say(data.message || "You're on the list.");
+      }} else {{
+        // A 400 is the visitor's typo and fixable here; anything else is ours,
+        // so hand them the hosted page rather than a dead end.
+        say(data.message || 'That did not go through.', true, answer.status >= 500);
+      }}
+    }} catch (error) {{
+      say('Could not reach the server.', true, true);
+    }} finally {{
+      button.disabled = false;
+      button.textContent = idle;
+    }}
+  }});
 }}
 
 // Rebuild the contact address. It ships reversed-then-base64'd, so it is not in

@@ -1,5 +1,6 @@
-# Only the generated page ships. Everything below is how it gets built, and
-# leaving pyproject.toml in makes Vercel try to build a Python app.
+# Only the generated page and `api/` ship. Everything below is how the page
+# gets built, and leaving pyproject.toml in makes Vercel try to build a Python
+# app. `api/subscribe.js` has no dependencies, so it needs nothing from here.
 src/
 tests/
 fixtures/
