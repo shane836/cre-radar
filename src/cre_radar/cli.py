@@ -145,9 +145,30 @@ def publish_cmd(
         typer.secho("not deployed (pass --deploy)", fg=typer.colors.YELLOW)
         return
 
-    # Deploy from the repo root, not from `public/`: the root carries
-    # vercel.json (which turns framework detection off) and the project link.
-    command = ["vercel", "deploy", "--yes"] + (["--prod"] if prod else [])
+    # Build here, then ship the output — never a bare `vercel deploy`.
+    #
+    # A bare deploy uploads the sources and builds them on Vercel, and the
+    # upload skips gitignored paths. `public/` is gitignored (it is generated),
+    # so the page never reaches the builder and the deployment comes out with
+    # `api/subscribe` and no site at all: `/` returns 404 while the function
+    # still answers. Verified against a preview deploy, Aug 2026 — the build
+    # listed one lambda and zero static files.
+    #
+    # `vercel build` runs against this working tree, where the page was written
+    # four lines ago, and `--prebuilt` ships that output verbatim.
+    #
+    # Both run from the repo root, not `public/`: the root carries vercel.json
+    # (which turns framework detection off) and the project link.
+    target = ["--prod"] if prod else []
+    build = subprocess.run(
+        ["vercel", "build", "--yes", *target],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )
+    if build.returncode != 0:
+        _echo_bad(build.stderr.strip() or "vercel build failed")
+        raise typer.Exit(1)
+
+    command = ["vercel", "deploy", "--prebuilt", "--yes", *target]
     result = subprocess.run(
         command, cwd=REPO_ROOT, capture_output=True, text=True, check=False
     )
