@@ -101,7 +101,10 @@ def test_about_says_who_built_it_and_where_he_works(page):
 
 def test_source_count_comes_from_the_registry_not_the_copy(page):
     """A number typed into prose goes stale the first time a source is added."""
-    assert "20 Los Angeles" in page
+    assert "20 Southern California" in page
+    other = site.render([], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC),
+                        source_count=31)
+    assert "31 Southern California" in other
 
 
 # --- The address must never be scrapeable -----------------------------------

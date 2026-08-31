@@ -239,21 +239,17 @@ def _about(source_count: int) -> str:
             f'rel="nofollow">{_esc(_mail_spelled(CONTACT_EMAIL))}</a>'
         )
 
+    # The colon only makes sense when there is something below it to point at.
+    reach = "the contact below:" if links else "me."
+
     return _drawer(
         "about",
         "About",
-        f"<p>Every morning this sweeps {source_count} Los Angeles commercial real "
-        "estate event calendars, scores what it finds against a rules file, and "
-        "lists whatever clears the bar. No AI, no account, no tracking &mdash; the "
-        "same inputs always produce the same list.</p>"
-        "<p>It filters for a <strong>principal</strong>: someone who raises capital, "
-        "buys assets and operates them. Most of the LA calendar is operator "
-        "education aimed at the people a principal hires, so it is scored down "
-        "hard, however good the session.</p>"
+        f"<p>Every morning this sweeps {source_count} Southern California commercial real "
+        "estate event calendars for relevant events.</p>"
         f'<p class="by">Built by <strong>{_esc(BUILDER)}</strong>, {_esc(BUILDER_ROLE)} '
         f'at <a href="{_esc(FIRM_URL)}" target="_blank" rel="noopener">'
-        f"{_esc(FIRM)}</a>. Missing a source worth watching, or seeing something "
-        "that should not be here? Tell me &mdash; it is one line in a config file.</p>"
+        f"{_esc(FIRM)}</a>. Send bug reports and event suggestions to {reach}</p>"
         + (f'<p class="links">{links}</p>' if links else ""),
     )
 
