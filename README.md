@@ -197,6 +197,23 @@ Things known to be missing, kept here rather than in someone's head.
   the digest to beehiiv's Send API, which needs the Max plan). Until that is
   done the page is making a promise the system does not keep — this is the one
   item on this list with a deadline attached to it.
+- **Link masonequitypartners.com from the digest footer.** The email footer is
+  `cre-radar · scored against scoring.toml` and the page footer adds `no AI,
+  just rules` — neither points anywhere. Once the digest goes to subscribers
+  rather than to one inbox, that footer is the only place it says who is
+  sending it. One line in `html_email` in `digest/render.py`, using
+  `site.FIRM_URL` rather than a fresh literal. The vault note has no footer and
+  needs none — nobody but Shane reads it.
+- **Set up a custom domain.** The site is on `cre-radar.vercel.app`. Moving it
+  means adding the domain in Vercel, then updating `SITE_URL` in `site.py`
+  (JSON-LD reads it) and the `utm_source` in both `site.py` and
+  `api/subscribe.js`, which currently name the vercel.app host. Do those in the
+  same commit as the DNS change or beehiiv's attribution splits across two
+  source names.
+- **Weekly: check the newsletter stats.** Opens, clicks and unsubscribes in
+  beehiiv, read against what actually went out. Nothing in this repo does it or
+  should — it is a standing item for the vault, listed here because the digest
+  is the thing being measured.
 - Shane's own digest stays daily and is unrelated: it goes through Resend to a
   named address, not through beehiiv.
 
