@@ -63,7 +63,7 @@ half-judged database.
 | `tests/` | 118 tests. `conftest.py` builds contract objects so tests never hand-roll a `NormalizedEvent`. |
 | `fixtures/` | real captured pages (AAGLA, BREAA, NAIOP SoCal). The extractor tests run offline against these — extraction regressions are caught without a network. |
 | `rubrics/` | `milestone-contract.md`, the PGE rubric the tests implement. Add a dimension there *before* adding a test. |
-| `scripts/` | `rebuild.sh` (drop and re-extract after an extraction change), `install-cron.sh` (the daily 07:00 entry). |
+| `scripts/` | `rebuild.sh` (drop and re-extract after an extraction change), `daily.sh` (the scheduled run: lock, log rotation, timestamps), `install-launchd.sh` (installs the daily 07:00 launchd agent). |
 | `assets/` | the firm's mark, light and dark. Inlined as base64 at render time — never deployed. |
 | `public/` | generated output. `index.html` is written by `publish` and served by Vercel. Never edit by hand; it is gitignored. |
 | `api/` | the one serverless function: `subscribe.js` takes the signup box's address and creates the subscription on cre-radar's beehiiv publication. Node, no dependencies, stores nothing. The only server-side code in the project. |

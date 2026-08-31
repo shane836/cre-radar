@@ -19,6 +19,9 @@ uv.lock
 .env
 .env.example
 cron.log
+cron.log.*
+launchd.log
+.run.lock
 
 # Local mockups. Never part of the deploy.
 *.jpg

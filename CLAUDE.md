@@ -25,6 +25,7 @@ uv run cre-radar doctor             # config pre-flight
 uv run cre-radar run                # the whole pipeline
 uv run cre-radar digest --dry-run   # safe: renders without delivering
 ./scripts/rebuild.sh                # after changing EXTRACTION rules
+./scripts/install-launchd.sh        # install the daily 07:00 agent
 ```
 
 ## Architecture
@@ -149,6 +150,38 @@ a different thing entirely.
 `site.py` and `BEEHIIV_SUBSCRIBE_URL` in the function both default to empty and
 omit the link, because a wrong link here puts an events reader on the firm's
 investor list. Fill them with cre-radar's own hosted page or leave them blank.
+
+## The daily run
+
+**launchd, not cron.** `scripts/install-launchd.sh` writes
+`~/Library/LaunchAgents/com.masonequity.cre-radar.plist`. cron skips a run
+outright when the Mac is asleep at the appointed minute; launchd runs it on the
+next wake. There is exactly one scheduler — the installer strips any leftover
+`cre-radar` crontab line, because two schedulers means two processes writing
+one SQLite file.
+
+`scripts/daily.sh` is the wrapper the agent invokes, and each part of it is
+load-bearing:
+
+- **The `mkdir` lock.** macOS ships no `flock(1)`, and `mkdir` is atomic
+  everywhere. A slow run must never have the next morning's run start on top of
+  it. A lock whose pid is dead is cleared, not honoured, or one power cut would
+  wedge the schedule permanently.
+- **No `set -e`.** A non-zero exit has to be logged and returned, not lost to
+  the shell exiting first.
+- **`uv run --directory`, not `cd`.** It sets uv's project root *and* the
+  working directory, so `.env` and the relative `CRE_DB` both resolve. The
+  plist's `WorkingDirectory` is `$HOME` deliberately: the repo is under
+  Dropbox, whose directory handle can be transiently unavailable, and launchd
+  fails the whole job if its chdir fails.
+- **`PATH` in both the plist and the script.** launchd reads no shell profile.
+  `publish --deploy` shells out to `vercel`, which lives in
+  `/opt/homebrew/bin` — omit it and the deploy fails nightly and silently.
+- **`RunAtLoad` is false.** True would fetch every source on install and again
+  at every login.
+
+Dropbox is also the risk: it can copy `cre_radar.db` mid-write. If the database
+ever comes back corrupt, that is the first thing to suspect.
 
 ## Vercel
 

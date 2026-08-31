@@ -160,10 +160,25 @@ uv run cre-radar sources check --browser
 ### Daily
 
 ```bash
-./scripts/install-cron.sh        # 07:00 by default; pass an hour to change it
-crontab -l | grep cre-radar      # verify
-tail -f cron.log                 # watch
+./scripts/install-launchd.sh          # 07:00 by default
+./scripts/install-launchd.sh 6 30     # or pass hour and minute
+tail -f cron.log                      # watch
+launchctl kickstart -p gui/$UID/com.masonequity.cre-radar   # run it now
 ```
+
+**launchd, not cron.** cron skips a run outright if the Mac is asleep at the
+appointed minute, and this laptop is usually shut at 07:00; launchd runs the
+job when the machine next wakes. A machine that is fully powered off still
+misses the day — launchd catches up from sleep, not from off.
+
+`scripts/daily.sh` is what the agent actually invokes, and it holds the three
+things a scheduled job needs that the pipeline should not know about: a lock so
+two runs never write the same SQLite file, a log that rotates at 2 MB, and a
+timestamp on every line. It exits non-zero on failure rather than swallowing it.
+
+If the first scheduled run produces nothing, grant Full Disk Access to
+`/bin/bash` — the repo is inside Dropbox, a protected location for background
+jobs, and the failure is otherwise silent.
 
 ## The site
 
@@ -372,7 +387,7 @@ assets/                   the firm's mark; inlined into the page, not deployed
 public/index.html         the generated site — output, never edit by hand
 rubrics/                  the PGE rubric the tests implement
 fixtures/                 real pages, for offline extraction tests
-scripts/                  install-cron.sh, rebuild.sh
+scripts/                  daily.sh, install-launchd.sh, rebuild.sh
 tests/                    118 tests; conftest.py builds contract objects
 
 src/cre_radar/
