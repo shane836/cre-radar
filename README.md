@@ -210,6 +210,21 @@ Things known to be missing, kept here rather than in someone's head.
   `api/subscribe.js`, which currently name the vercel.app host. Do those in the
   same commit as the DNS change or beehiiv's attribution splits across two
   source names.
+- **A honeypot that identifies AI agents.** Who is crawling this page, and
+  which of them ignore the rules. The mechanics are cheap: a `robots.txt` that
+  disallows a path no human can reach, a link to it hidden from sighted readers
+  and from the tab order, and a Vercel function behind it that records the
+  user-agent, IP and timestamp. A person never follows it. A well-behaved
+  crawler reads `robots.txt` and stays out. Anything left in the log either
+  ignored `robots.txt` or does not read it — which is the interesting set.
+
+  Two notes for whoever builds it. The name collides: `api/subscribe.js`
+  already has a honeypot, the hidden `company` field, and that one is a spam
+  filter rather than a census — pick distinct names or the two get confused.
+  And this needs no model and no API key, so it sits inside the project's
+  existing rules rather than against them; the only new cost is one more
+  function and somewhere to keep the log.
+
 - **Weekly: check the newsletter stats.** Opens, clicks and unsubscribes in
   beehiiv, read against what actually went out. Nothing in this repo does it or
   should — it is a standing item for the vault, listed here because the digest
