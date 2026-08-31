@@ -281,13 +281,19 @@ def test_embed_replaces_the_form_when_configured(monkeypatch):
 # --- The product name is one constant ---------------------------------------
 
 def test_the_public_name_is_on_the_page_in_every_slot(page):
-    assert "<title>SoCal CRE Events</title>" in page
-    assert '<a class="brand" href="#top">SoCal CRE Events</a>' in page
-    assert "Upcoming SoCal CRE Events</h1>" in page
+    assert "<title>CRE Events Radar</title>" in page
+    assert '<a class="brand" href="#top">CRE Events Radar</a>' in page
     assert json.loads(
         re.search(r'<script type="application/ld\+json">(.*?)</script>', page, re.DOTALL)
         .group(1)
-    )["name"] == "SoCal CRE Events"
+    )["name"] == "CRE Events Radar"
+
+
+def test_the_heading_is_not_the_product_name(page):
+    """"Upcoming CRE Events Radar" does not read as English. The listing shows
+    upcoming events; the product is called the radar. Two strings, on purpose."""
+    assert "Upcoming CRE Events</h1>" in page
+    assert "Upcoming CRE Events Radar" not in page
 
 
 def test_renaming_the_product_does_not_rename_the_command(monkeypatch):
@@ -296,6 +302,6 @@ def test_renaming_the_product_does_not_rename_the_command(monkeypatch):
     monkeypatch.setattr(site, "APP_NAME", "Renamed Thing")
     page = site.render([], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC))
 
-    assert "SoCal CRE Events" not in page
-    assert page.count("Renamed Thing") == 4      # title, brand, h1, json-ld
+    assert "CRE Events Radar" not in page
+    assert page.count("Renamed Thing") == 3      # title, brand, json-ld
     assert "cre-radar" in page                   # the footer credit stands

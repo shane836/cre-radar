@@ -17,7 +17,7 @@ import sqlite3
 from datetime import datetime
 from functools import cache
 
-from . import APP_NAME
+from . import APP_NAME, HEADING
 from .digest.render import _local, _meta_parts, group_by_week
 
 # Same palette as the email, so the two read as one product.
@@ -524,7 +524,7 @@ h1{{font-size:24px;letter-spacing:-.01em;margin-bottom:4px}}
 {_subscribe()}
 {_about()}
 <div class="wrap" id="top">
-<h1>&#128197; Upcoming {_esc(APP_NAME)}</h1>
+<h1>&#128197; {_esc(HEADING)}</h1>
 <p class="sub">{len(rows)} events &middot; updated {generated.strftime('%-d %b %Y, %H:%M')} PT</p>
 <div class="filters">
 <button class="filter" data-filter="all" aria-pressed="true">All<span class="count">{len(rows)}</span></button>

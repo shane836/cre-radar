@@ -234,6 +234,16 @@ Things known to be missing, kept here rather than in someone's head.
   projects means a change to the website's routing can silently break this
   page, and that is a bad trade until the traffic justifies it.
 
+- **Implement `mode = "ical"`.** It is documented in `sources.toml`'s header
+  and in `SourceTier`, but `FeedAdapter.fetch` returns a SourceError saying it
+  is unsupported. That gap is what keeps the A.CRE source disabled: its iCal
+  export carries a real `LOCATION` per event, and the HTML route does not, so
+  scraping the page yields events with no `city` and the geography rules cannot
+  drop the out-of-region ones. Any WordPress "The Events Calendar" site is
+  reachable this way, so it unlocks more than one source. Note `sources check`
+  will not catch this class of problem — it measures condensed bytes, not
+  whether the mode is implemented or whether `city` survives extraction.
+
 - **Weekly: check the newsletter stats.** Opens, clicks and unsubscribes in
   beehiiv, read against what actually went out. Nothing in this repo does it or
   should — it is a standing item for the vault, listed here because the digest

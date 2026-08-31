@@ -11,4 +11,10 @@ This module imports nothing, which is what keeps that true.
 """
 from __future__ import annotations
 
-APP_NAME = "SoCal CRE Events"
+APP_NAME = "CRE Events Radar"
+
+# The heading over the listing, in all three channels. Separate from APP_NAME
+# on purpose: the name reads as a name, but "Upcoming CRE Events Radar" does
+# not read as English. What the page shows is upcoming events; what the product
+# is called is the radar.
+HEADING = "Upcoming CRE Events"

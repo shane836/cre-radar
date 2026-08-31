@@ -190,6 +190,33 @@ url = "https://www.connectcre.com/events/"
 mode = "browser"
 verification_level = "community"
 
+# --- Disabled: needs `ical` support before it can be enabled -----------------
+
+[[source]]
+slug = "acre"
+org = "Adventures in CRE"
+url = "https://adventuresincre.com/events/?ical=1&eventDisplay=list"
+mode = "ical"
+enabled = false
+verification_level = "community"
+timezone = "America/Los_Angeles"   # national body; see the timezone note above
+# A.CRE's calendar is The Events Calendar (WordPress). Three routes in, and
+# only one of them is safe. Checked 2026-08-30:
+#
+#   ical   `?ical=1&eventDisplay=list` -> 30 VEVENTs with a real LOCATION on
+#          each. This is the one we want. `eventDisplay=list` is load-bearing:
+#          the bare `?ical=1` follows the page's default view and exports a
+#          single event. Blocked only by `mode = "ical"` being unimplemented —
+#          `FeedAdapter.fetch` returns a SourceError saying so.
+#   rss    2 items. Not a usable feed, unlike haas-alumni's.
+#   html   works, and is the trap. It extracts 40 events and leaves `city`
+#          empty on all of them, so the geography rules have nothing to filter
+#          on and 9 out-of-region events clear the floor: Boca Raton, Columbus,
+#          Connecticut, Philadelphia, Long Island. Do not enable it this way.
+#
+# Yield when it does work will be low and that is expected — of 30 events one
+# was in LA and four in California. It is here for the one.
+
 # --- Disabled: blocked, kept for a future retest -----------------------------
 
 [[source]]
