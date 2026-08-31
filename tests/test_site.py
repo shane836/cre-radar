@@ -54,6 +54,24 @@ def test_logo_is_inlined_not_linked(page):
     assert 'src="data:image/png;base64,' in page
 
 
+def test_montserrat_is_self_hosted_not_fetched(page):
+    """The firm's typeface, without the firm's Google Fonts request. A
+    `@import` or a `<link>` to fonts.googleapis.com would be the page's first
+    external request ever."""
+    assert "@font-face" in page
+    assert "src:url(data:font/woff2;base64," in page
+    assert "fonts.googleapis.com" not in page
+    assert "fonts.gstatic.com" not in page
+
+
+def test_filled_controls_never_hardcode_white(page):
+    """`--accent` inverts to bone in dark mode, so `#fff` on it is 2.5:1.
+    Every filled control has to take its text from `--on-accent`."""
+    style = re.search(r"<style>(.*?)</style>", page, re.DOTALL).group(1)
+    assert "color:#fff" not in style          # only `--on-accent` may be white
+    assert "color:var(--on-accent)" in style
+
+
 def test_logo_reserves_its_space(page):
     """Without intrinsic dimensions the nav reflows as the data URI decodes."""
     assert 'width="131" height="84"' in page
@@ -65,7 +83,7 @@ def test_nav_carries_both_entry_points(page):
     assert 'data-drawer="aboutDrawer"' in page
     assert 'data-drawer="subscribeDrawer"' in page
     assert ">About</button>" in page
-    assert ">Subscribe</button>" in page
+    assert "Get Events in your Inbox</button>" in page
 
 
 def test_toggles_declare_what_they_control(page):
@@ -125,6 +143,27 @@ def test_no_js_fallback_is_readable_but_not_a_regex_match(page):
     assert "radar at example dot com" in page
 
 
+def test_no_js_fallback_lives_in_noscript(page):
+    """The link's visible content is an icon once the script runs. The spelled
+    address has to stay reachable for the reader who never gets that far."""
+    assert "<noscript>radar at example dot com</noscript>" in page
+
+
+def test_icon_only_links_carry_an_accessible_name(page):
+    """An anchor whose only child is a decorative SVG announces as nothing."""
+    assert 'aria-label="LinkedIn"' in page
+    assert 'aria-label="Email"' in page
+    assert page.count('aria-hidden="true"') >= 2
+
+
+def test_the_mail_label_is_generic_until_the_script_decodes_it(page):
+    """`aria-label` is page source like any other attribute. The real address
+    goes in only at runtime, or the encoding was pointless."""
+    label = re.search(r'id="mail"[^>]*aria-label="([^"]+)"', page).group(1)
+    assert label == "Email"
+    assert "aria-label', address" in page   # ...and the script replaces it
+
+
 def test_jsonld_carries_attribution_but_never_the_address(page):
     raw = re.search(
         r'<script type="application/ld\+json">(.*?)</script>', page, re.DOTALL
@@ -169,13 +208,13 @@ def test_subscribe_points_at_the_one_beehiiv_audience_and_is_tagged(page):
 def test_drawer_bodies_are_not_left_in_the_page_flow(page):
     """They live under the nav now. A stray copy at the bottom would show the
     same text twice for anyone without JS."""
-    assert page.count("Learn how we think") == 1
+    assert page.count("Events in your inbox") == 1
     assert page.count("Built by") == 1
 
 
 def test_subscribe_uses_the_sites_own_copy(page):
-    assert "Learn how we think" in page
-    assert "notes from the field" in page
+    assert "Events in your inbox" in page
+    assert "Sign up below for an email digest of SoCal Real Estate Events." in page
     assert "No spam. Unsubscribe anytime." in page
 
 

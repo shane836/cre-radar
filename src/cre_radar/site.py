@@ -42,6 +42,11 @@ SITE_URL = "https://cre-radar.vercel.app"
 # renders about five pixels tall.
 LOGO_LIGHT = "assets/mep-mark-light.png"
 LOGO_DARK = "assets/mep-mark-dark.png"
+# Montserrat is the firm's only typeface. The website pulls it from Google
+# Fonts; this page cannot without giving up its zero-external-requests
+# property, so the latin subset of the variable file (weights 200-600) is
+# self-hosted here and inlined. SIL OFL, licence alongside it.
+FONT = "assets/fonts/montserrat-latin-var.woff2"
 BUILDER = "Shane Mason"
 BUILDER_ROLE = "principal"
 FIRM = "Mason Equity Partners"
@@ -108,6 +113,26 @@ def _mail_spelled(address: str) -> str:
     return f"{local} at {domain.replace('.', ' dot ')}"
 
 
+# Inline SVG rather than an icon font or a sprite URL: the page's
+# zero-external-requests property is the whole reason the mark is base64'd too.
+# Both are filled paths on `currentColor`, so they pick up the pill's hover
+# colour without a second rule.
+_ICON_LINKEDIN = (
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    '<path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 '
+    '2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 '
+    '5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 '
+    '20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 '
+    '1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>'
+)
+_ICON_MAIL = (
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    '<path d="M3 5h18a1 1 0 0 1 1 1v.4l-9.48 6.09a1 1 0 0 1-1.04 0L2 6.4V6a1 1 0 0 1 '
+    '1-1zm19 3.58V18a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8.58l8.94 5.74a3 3 0 0 0 3.12 '
+    '0L22 8.58z"/></svg>'
+)
+
+
 def _jsonld() -> str:
     """schema.org attribution, so `who built this` is machine-answerable too.
 
@@ -149,7 +174,7 @@ def _drawer(name: str, heading: str, body: str) -> str:
 
 
 @cache
-def _data_uri(relative: str) -> str:
+def _data_uri(relative: str, mime: str = "image/png") -> str:
     """Inline an asset as base64.
 
     Read at render time rather than pasted into this file as a literal: the
@@ -159,7 +184,17 @@ def _data_uri(relative: str) -> str:
     from .config import REPO_ROOT
 
     raw = (REPO_ROOT / relative).read_bytes()
-    return f"data:image/png;base64,{base64.b64encode(raw).decode()}"
+    return f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+
+
+def _font_uri() -> str:
+    """The typeface, inlined the same way the mark is.
+
+    Adds ~47 KB of base64 to the page. That buys the firm's typeface with
+    no request to fonts.gstatic.com, no FOUT, and no third party learning
+    who read the page - the same trade the mark already makes.
+    """
+    return _data_uri(FONT, "font/woff2")
 
 
 def _logo() -> str:
@@ -190,7 +225,8 @@ def _nav() -> str:
         '<button class="navlink" data-drawer="aboutDrawer" '
         'aria-controls="aboutDrawer" aria-expanded="false">About</button>'
         '<button class="navcta" data-drawer="subscribeDrawer" '
-        'aria-controls="subscribeDrawer" aria-expanded="false">Subscribe</button>'
+        'aria-controls="subscribeDrawer" aria-expanded="false">'
+        "Get Events in your Inbox</button>"
         "</div></nav>"
     )
 
@@ -217,9 +253,8 @@ def _subscribe() -> str:
 
     return _drawer(
         "subscribe",
-        "Learn how we think",
-        "<p>For more events in your inbox, plus market observations and notes "
-        "from the field, subscribe here.</p>"
+        "Events in your inbox",
+        "<p>Sign up below for an email digest of SoCal Real Estate Events.</p>"
         f"{action}"
         '<p class="fine">No spam. Unsubscribe anytime.</p>',
     )
@@ -227,16 +262,25 @@ def _subscribe() -> str:
 
 def _about(source_count: int) -> str:
     """Who made this, why it exists, and how to reach him."""
+    # Icon-only, so each needs an `aria-label`: an anchor whose only content is
+    # a decorative SVG has no accessible name at all. The mail label stays the
+    # generic "Email" in the source — putting the address there would hand it
+    # straight back to the harvesters `_mail_token` exists to defeat — and the
+    # script swaps in the real one once it has decoded it.
     links = ""
     if LINKEDIN_URL:
         links += (
-            f'<a href="{_esc(LINKEDIN_URL)}" target="_blank" rel="noopener">'
-            "LinkedIn</a>"
+            f'<a class="icon" href="{_esc(LINKEDIN_URL)}" target="_blank" '
+            f'rel="noopener" aria-label="LinkedIn">{_ICON_LINKEDIN}</a>'
         )
     if CONTACT_EMAIL:
+        # The spelled fallback moves inside <noscript>: with the script running
+        # the icon is the whole link, and without it the reader still gets a
+        # readable address instead of an envelope that does nothing.
         links += (
-            f'<a class="mail" id="mail" data-a="{_mail_token(CONTACT_EMAIL)}" '
-            f'rel="nofollow">{_esc(_mail_spelled(CONTACT_EMAIL))}</a>'
+            f'<a class="icon mail" id="mail" data-a="{_mail_token(CONTACT_EMAIL)}" '
+            f'rel="nofollow" aria-label="Email">{_ICON_MAIL}'
+            f"<noscript>{_esc(_mail_spelled(CONTACT_EMAIL))}</noscript></a>"
         )
 
     # The colon only makes sense when there is something below it to point at.
@@ -249,7 +293,8 @@ def _about(source_count: int) -> str:
         "estate event calendars for relevant events.</p>"
         f'<p class="by">Built by <strong>{_esc(BUILDER)}</strong>, {_esc(BUILDER_ROLE)} '
         f'at <a href="{_esc(FIRM_URL)}" target="_blank" rel="noopener">'
-        f"{_esc(FIRM)}</a>. Send bug reports and event suggestions to {reach}</p>"
+        f"{_esc(FIRM)}</a>.</p>"
+        f"<p>Send bug reports and event suggestions to {reach}</p>"
         + (f'<p class="links">{links}</p>' if links else ""),
     )
 
@@ -308,108 +353,156 @@ real estate investment events, updated daily.">
 <script type="application/ld+json">{_jsonld()}</script>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
+/* Montserrat, self-hosted. The firm's site loads it from Google; this page
+   cannot, so the latin subset ships base64'd in the stylesheet exactly like
+   the mark does. One variable file covers 200-600, which is every weight the
+   brand uses. SIL OFL - the licence travels in `assets/fonts/OFL.txt`. */
+@font-face{{font-family:'Montserrat';font-style:normal;font-weight:200 600;
+  src:url({_font_uri()}) format('woff2')}}
+/* The firm's palette, not a recolour of it: monochrome on bone, with black as
+   the only accent. `--accent` therefore inverts to bone in dark mode, which is
+   why filled controls take their text from `--on-accent` and never `#fff`. */
 :root{{
-  --bg:#f6f7f9; --card:#fff; --line:#e6e6eb; --ink:#1b1b20; --dim:#7a7a85;
-  --head:#f2f3f6; --accent:#1a56b8; --on-accent:#fff;
+  --bg:#f5f2ec; --card:#fff; --line:#dcdcdc; --ink:#111; --dim:#4f4f4f;
+  --head:#ede9e1; --accent:#111; --on-accent:#fff;
 }}
 @media (prefers-color-scheme:dark){{
-  :root{{--bg:#141417;--card:#1c1c21;--line:#2c2c33;--ink:#f0f0f2;--dim:#9a9aa4;
-        --head:#232329;--accent:#7aa5f0;--on-accent:#141417}}
+  :root{{--bg:#0f0f0f;--card:#161616;--line:#2a2a2a;--ink:#f5f2ec;--dim:#a6a29a;
+        --head:#1c1c1c;--accent:#f5f2ec;--on-accent:#111}}
 }}
 body{{background:var(--bg);color:var(--ink);
-  font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-  padding:0 0 60px}}
-.wrap{{max-width:640px;margin:0 auto;padding:22px 14px 0}}
-h1{{font-size:24px;letter-spacing:-.01em;margin-bottom:4px}}
-.sub{{color:var(--dim);font-size:13px;margin-bottom:18px}}
-.filters{{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}}
-.filter{{background:var(--card);border:1px solid var(--line);color:var(--ink);
-  border-radius:999px;padding:5px 13px;font-size:13px;cursor:pointer;
-  display:flex;align-items:center;gap:6px;font-family:inherit}}
-.filter:hover{{border-color:var(--accent)}}
-.filter[aria-pressed=true]{{background:var(--accent);border-color:var(--accent);color:#fff}}
-.count{{opacity:.6;font-size:11px}}
-.week{{background:var(--card);border:1px solid var(--line);border-radius:12px;
-  overflow:hidden;margin-bottom:14px}}
-.week h2{{background:var(--head);padding:8px 16px;font-size:11px;font-weight:700;
-  letter-spacing:.07em;color:var(--dim)}}
+  font:300 15px/1.68 'Montserrat',system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;padding:0 0 72px}}
+a:focus-visible,button:focus-visible{{outline:2px solid var(--ink);outline-offset:3px}}
+.wrap{{max-width:680px;margin:0 auto;padding:40px 24px 0}}
+h1{{font-weight:200;font-size:clamp(28px,5vw,40px);letter-spacing:-.02em;
+  line-height:1.1;margin-bottom:10px}}
+.sub{{color:var(--dim);font-size:13px;margin-bottom:28px}}
+/* The brand's one label style: 11px, 500, .14em, uppercase. Filters, week
+   headings, date chips, pills and buttons are all that same stamp at different
+   sizes, which is what makes the page read as the firm's rather than as a
+   pill-shaped dashboard. Square corners throughout for the same reason. */
+.filters{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}}
+.filter{{background:transparent;border:1px solid var(--line);color:var(--ink);
+  border-radius:0;padding:9px 16px;font-size:11px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+  display:flex;align-items:center;gap:8px;font-family:inherit;
+  transition:background-color .3s ease,border-color .3s ease,color .3s ease}}
+.filter:hover{{border-color:var(--ink)}}
+.filter[aria-pressed=true]{{background:var(--accent);border-color:var(--accent);
+  color:var(--on-accent)}}
+.count{{opacity:.6;font-size:10px;letter-spacing:.08em}}
+.week{{background:var(--card);border:1px solid var(--line);margin-bottom:20px}}
+.week h2{{padding:14px 20px 12px;font-size:11px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  border-bottom:1px solid var(--line)}}
 .week.hidden,.event.hidden{{display:none}}
-.event{{display:flex;gap:14px;align-items:flex-start;padding:13px 16px;
+.event{{display:flex;gap:18px;align-items:flex-start;padding:18px 20px;
   border-top:1px solid var(--line)}}
 .week h2 + .event{{border-top:0}}
-.chip{{flex:0 0 52px;border:1px solid var(--line);border-radius:8px;padding:5px 0;
-  display:flex;flex-direction:column;align-items:center;line-height:1.15}}
-.dow,.mon{{font-size:10px;letter-spacing:.06em;color:var(--dim)}}
-.day{{font-size:20px;font-weight:700}}
+.chip{{flex:0 0 56px;border:1px solid var(--line);padding:8px 0;
+  display:flex;flex-direction:column;align-items:center;line-height:1.2}}
+.dow,.mon{{font-size:9px;font-weight:500;letter-spacing:.14em;color:var(--dim)}}
+.day{{font-size:22px;font-weight:200;letter-spacing:-.02em}}
 .body{{flex:1;min-width:0}}
-.title{{font-size:15px;font-weight:600;color:var(--ink);text-decoration:none;
-  display:block}}
-.title:hover{{color:var(--accent);text-decoration:underline}}
-.meta{{font-size:12.5px;color:var(--dim);margin-top:3px}}
-.pill{{flex:0 0 auto;font-size:11px;font-weight:600;padding:3px 10px;
-  border-radius:11px;white-space:nowrap}}
+.title{{font-size:16px;font-weight:400;line-height:1.4;color:var(--ink);
+  text-decoration:none;display:block}}
+/* No colour shift on hover: the accent *is* the ink here, so the underline is
+   the whole affordance. */
+.title:hover{{text-decoration:underline;text-underline-offset:3px}}
+.meta{{font-size:12.5px;color:var(--dim);margin-top:5px}}
+.pill{{flex:0 0 auto;font-size:9.5px;font-weight:500;letter-spacing:.12em;
+  text-transform:uppercase;padding:5px 10px;white-space:nowrap}}
 {"".join(f'.pill.{n}{{background:{bg};color:{fg}}}' for n, (bg, fg) in _PILL.items())}
-.empty,.foot{{color:var(--dim);font-size:12px;text-align:center;padding:20px 0}}
-.nav{{position:sticky;top:0;z-index:40;background:var(--card);
+.empty,.foot{{color:var(--dim);font-size:12px;text-align:center;padding:28px 0}}
+.nav{{position:sticky;top:0;z-index:40;background:var(--bg);
   border-bottom:1px solid var(--line)}}
-.navin{{max-width:640px;margin:0 auto;padding:0 14px;height:52px;
-  display:flex;align-items:center;gap:8px}}
+.navin{{max-width:680px;margin:0 auto;padding:0 24px;height:64px;
+  display:flex;align-items:center;gap:14px}}
 .logo{{display:flex;align-items:center;flex:0 0 auto}}
-.logo img{{height:28px;width:auto;display:block}}
-.brand{{font-weight:700;font-size:15px;margin-right:auto;letter-spacing:-.01em;
-  color:var(--ink);text-decoration:none;padding-left:11px;margin-left:11px;
-  border-left:1px solid var(--line);white-space:nowrap}}
-.brand:hover{{color:var(--accent)}}
+.logo img{{height:34px;width:auto;display:block}}
+.brand{{font-size:12px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  margin-right:auto;color:var(--ink);text-decoration:none;padding-left:14px;
+  margin-left:14px;border-left:1px solid var(--line);white-space:nowrap}}
+/* The site's nav underline: a hairline that wipes in from the left and out to
+   the right, rather than a background swap. */
+.navlink{{font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink);padding:6px 2px;background:none;border:0;cursor:pointer;
+  font-family:inherit;position:relative}}
+.navlink::after{{content:"";position:absolute;left:2px;right:2px;bottom:0;height:1px;
+  background:var(--ink);transform:scaleX(0);transform-origin:right center;
+  transition:transform .4s cubic-bezier(.2,.8,.2,1)}}
+.navlink:hover::after,.navlink[aria-expanded=true]::after{{transform:scaleX(1);
+  transform-origin:left center}}
+.navcta{{font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+  background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);
+  padding:11px 20px;font-family:inherit;cursor:pointer;white-space:nowrap;
+  transition:background-color .3s ease,color .3s ease,border-color .3s ease}}
+.navcta:hover,.navcta[aria-expanded=true]{{background:transparent;color:var(--ink);
+  border-color:var(--ink)}}
+/* After the rules it overrides, not before them: same specificity, so source
+   order is the only thing deciding, and the phone sizes have to win. */
 @media (max-width:560px){{
+  .navin{{height:58px;padding:0 16px;gap:10px}}
   .brand{{font-size:0;padding:0;margin:0 auto 0 0;border:0}}
+  .logo img{{height:28px}}
+  .navlink{{font-size:10px;letter-spacing:.08em}}
+  /* The CTA label is long enough to push the bar past a narrow phone once the
+     brand has collapsed. Trimming the tracking beats wrapping a sticky navbar. */
+  .navcta{{font-size:9.5px;letter-spacing:.05em;padding:9px 11px}}
 }}
-.navlink{{font-size:13.5px;color:var(--ink);text-decoration:none;padding:7px 12px;
-  border-radius:999px;font-family:inherit;background:none;border:0;cursor:pointer}}
-.navlink:hover,.navlink[aria-expanded=true]{{background:var(--head)}}
-.navcta{{font-size:13.5px;font-weight:600;background:var(--accent);
-  color:var(--on-accent);text-decoration:none;padding:7px 14px;border-radius:999px;
-  font-family:inherit;border:0;cursor:pointer;white-space:nowrap}}
-.navcta:hover{{opacity:.9}}
 .drawer{{background:var(--head);border-bottom:1px solid var(--line)}}
 /* Collapsed only once the script has confirmed it can open them again.
-   `visibility` is what keeps a closed drawer out of the tab order — height
+   `visibility` is what keeps a closed drawer out of the tab order - height
    alone leaves its links focusable but invisible. */
 .js .drawer{{max-height:0;overflow:hidden;visibility:hidden;border-bottom:0;
-  transition:max-height .22s ease,visibility .22s}}
+  transition:max-height .28s cubic-bezier(.2,.8,.2,1),visibility .28s}}
 .js .drawer.open{{max-height:640px;visibility:visible;
   border-bottom:1px solid var(--line)}}
-.drawin{{max-width:640px;margin:0 auto;padding:18px 14px}}
-.drawin h2{{font-size:11px;font-weight:700;letter-spacing:.07em;color:var(--dim);
-  text-transform:uppercase;margin-bottom:11px}}
-.drawin p{{font-size:13.5px;margin-bottom:10px}}
+.drawin{{max-width:680px;margin:0 auto;padding:40px 24px 44px}}
+/* A real heading at the firm's weight, not an uppercase eyebrow: the drawer is
+   the page's one piece of prose, and the site sets prose in thin, tight,
+   caps-off type. */
+.drawin h2{{font-weight:200;font-size:clamp(24px,3.6vw,34px);letter-spacing:-.02em;
+  line-height:1.1;color:var(--ink);margin-bottom:16px}}
+.drawin p{{font-size:16px;line-height:1.68;color:var(--dim);margin-bottom:12px;
+  max-width:52ch}}
 .drawin p:last-child{{margin-bottom:0}}
-.drawin a{{color:var(--accent)}}
-.drawin .links a{{color:var(--ink);background:var(--card)}}
-.links{{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}}
-.links a{{display:inline-flex;align-items:center;background:var(--head);
-  border:1px solid var(--line);border-radius:999px;padding:6px 14px;
-  font-size:13px;text-decoration:none;color:var(--ink)}}
-.links a[href]:hover{{border-color:var(--accent);color:var(--accent)}}
+.drawin a{{color:var(--ink);text-decoration:underline;text-underline-offset:3px}}
+.drawin .by strong{{font-weight:500;color:var(--ink)}}
+.links{{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}}
+.links a{{display:inline-flex;align-items:center;gap:8px;background:transparent;
+  border:1px solid var(--line);padding:11px 18px;font-size:11px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;text-decoration:none;
+  color:var(--ink);transition:background-color .3s ease,border-color .3s ease,color .3s ease}}
+.links a[href]:hover{{border-color:var(--ink)}}
+.links a.icon{{padding:11px 14px}}
+.links a svg{{width:15px;height:15px;display:block;fill:currentColor}}
+/* Filled, then inverting on hover - the site's primary button. */
+.links a.cta{{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}}
+.links a.cta:hover{{background:transparent;color:var(--ink);border-color:var(--ink)}}
 /* No href until the script runs, so it must not pretend to be clickable.
    Kept at full --ink: --dim on --head is 3.8:1 in light mode, and this is the
    state a reader with JS disabled is stuck with. Only the cursor differs. */
 .mail:not([href]){{cursor:text}}
-.join .cta{{background:var(--accent);border-color:var(--accent);
-  color:var(--on-accent);font-weight:600}}
-.join .cta:hover{{opacity:.9;color:var(--on-accent)}}
-.fine{{font-size:12px;color:var(--dim);margin-top:11px}}
-.embed{{width:100%;border:0;margin-top:13px;min-height:64px;
+.fine{{font-size:12px;color:var(--dim);margin-top:16px}}
+.embed{{width:100%;border:0;margin-top:20px;min-height:64px;
   color-scheme:light dark}}
+/* The pill drops to its own line on a phone. `flex-wrap` alone does not do it:
+   `.body` is `min-width:0`, so it shrinks to a two-word column forever rather
+   than pushing anything past the edge. Giving it a floor is what forces the
+   wrap. 74px is the chip plus the gap, so the pill lines up under the title. */
 @media (max-width:480px){{
   .event{{flex-wrap:wrap}}
-  .pill{{order:3;margin-left:66px}}
+  .body{{min-width:55%}}
+  .pill{{order:3;margin-left:74px}}
 }}
 </style></head><body>
 {_nav()}
 {_subscribe()}
 {_about(source_count)}
 <div class="wrap" id="top">
-<h1>&#128197; Upcoming LA Real Estate Events</h1>
+<h1>Upcoming LA Real Estate Events</h1>
 <p class="sub">{len(rows)} events &middot; updated {generated.strftime('%-d %b %Y, %H:%M')} PT</p>
 <div class="filters">
 <button class="filter" data-filter="all" aria-pressed="true">All<span class="count">{len(rows)}</span></button>
@@ -460,12 +553,14 @@ if (wanted === 'about' || wanted === 'subscribe') {{
 
 // Rebuild the contact address. It ships reversed-then-base64'd, so it is not in
 // the source in any form a harvester's regex matches. Until this runs the link
-// has no href and reads as "name at host dot com" — degraded, never broken.
+// has no href and its <noscript> spells the address out — degraded, never broken.
+// Sets the label rather than the text: the text is the envelope icon.
 const mail = document.getElementById('mail');
 if (mail) {{
   const address = atob(mail.dataset.a).split('').reverse().join('');
   mail.href = 'mailto:' + address;
-  mail.textContent = address;
+  mail.title = address;
+  mail.setAttribute('aria-label', address);
 }}
 </script>
 </body></html>"""

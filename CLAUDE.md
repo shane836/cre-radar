@@ -85,9 +85,32 @@ it. The listing is the page; everything else is one click away.
   `BEEHIIV_EMBED_URL` all default to `""` and the renderer skips them rather
   than emitting `href=""`. Do not add a placeholder value to "fix" a blank spot.
 
-`--on-accent` exists because `--accent` inverts in dark mode: white on the dark
-blue is 6.9:1, but white on the light blue is **2.5:1**, a WCAG failure. Any new
-accent-filled control uses `var(--on-accent)` for its text, never `#fff`.
+## The page wears the firm's design system
+
+`masonequitypartners.com` is monochrome Montserrat on bone: `#111` ink, `#4F4F4F`
+mid, `#DCDCDC` rules, `#F5F2EC` paper. The page uses those values, not an
+approximation of them.
+
+- **Montserrat ships inlined, never linked.** The firm's site pulls it from
+  Google Fonts; a `<link>` here would be this page's first external request
+  ever. `assets/fonts/montserrat-latin-var.woff2` is the latin subset of the
+  variable file (weights 200–600, ~35 KB) and `_font_uri()` base64s it into the
+  stylesheet the same way the mark is. SIL OFL; the licence sits beside it.
+- **Two type roles, and only two.** Prose is weight 200–400 with normal casing —
+  headings at 200 and `-.02em`. Everything else — buttons, filters, week
+  headings, date chips, category pills — is the label stamp: 11px, weight 500,
+  `.14em`, uppercase. Square corners throughout; the brand has no pills.
+- **`--accent` is the ink, so hover cannot be a colour change.** Links and
+  titles underline instead. Filled controls invert on hover, matching
+  `.mep-invest-btn` on the site.
+- **`--on-accent` exists because `--accent` inverts in dark mode** — `#111` in
+  light, bone in dark. Any accent-filled control takes its text from
+  `var(--on-accent)`, never `#fff`; `tests/test_site.py` greps for `color:#fff`.
+- **The category pill colours stay.** They are the email's palette, shared so
+  the two read as one product, and they are the page's only colour on purpose.
+- **Media queries go *after* the rules they override.** Same specificity means
+  source order decides. The `max-width:560px` block once sat above `.navcta`
+  and every phone override in it silently lost.
 
 ## The mailing list is not this project's
 
