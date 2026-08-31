@@ -36,7 +36,10 @@ _ORDER = ("panel", "networking", "webinar", "conference")
 # link constants may be left empty — the renderer omits the link rather than
 # emitting a dead one.
 
-SITE_URL = "https://cre-radar.vercel.app"
+# The canonical host. The vercel.app URL still resolves and always will, but
+# only one of them belongs in the JSON-LD and in a signup's `utm_source`, or
+# beehiiv attribution splits across two names for the same page.
+SITE_URL = "https://radar.masonequitypartners.com"
 # The firm's mark, recoloured for each theme from `mep-mark.png` in the website
 # repo. The stacked lockup is not usable here: at navbar height its wordmark
 # renders about five pixels tall.
@@ -73,7 +76,7 @@ SUBSCRIBE_ENDPOINT = "/api/subscribe"
 # rather than shipping a dead one. `api/subscribe.js` reads the same URL from
 # `BEEHIIV_SUBSCRIBE_URL` for its no-JavaScript error page.
 SUBSCRIBE_URL = ""
-SUBSCRIBE_UTM = "utm_source=cre-radar.vercel.app&utm_medium=cre-radar"
+SUBSCRIBE_UTM = "utm_source=radar.masonequitypartners.com&utm_medium=cre-radar"
 
 # beehiiv's own embed (Settings -> Subscribe Forms -> Embed), e.g.
 # "https://embeds.beehiiv.com/<uuid>". Set this and the block becomes beehiiv's

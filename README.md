@@ -11,7 +11,7 @@ the only place the public one is written (and once more, unavoidably, in
 `api/subscribe.js`, which is not Python). Renaming the product must never mean
 renaming the command.
 
-**Live:** https://cre-radar.vercel.app
+**Live:** https://radar.masonequitypartners.com
 
 **No API key. No model. No per-run cost.** Everything is deterministic scripts —
 the same inputs always produce the same digest.
@@ -219,26 +219,20 @@ Things known to be missing, kept here rather than in someone's head.
   sending it. One line in `html_email` in `digest/render.py`, using
   `site.FIRM_URL` rather than a fresh literal. The vault note has no footer and
   needs none — nobody but Shane reads it.
-- **Set up a custom domain.** The site is on `cre-radar.vercel.app`. Moving it
-  means adding the domain in Vercel, then updating `SITE_URL` in `site.py`
-  (JSON-LD reads it) and the `utm_source` in both `site.py` and
-  `api/subscribe.js`, which currently name the vercel.app host. Do those in the
-  same commit as the DNS change or beehiiv's attribution splits across two
-  source names.
-- **A honeypot that identifies AI agents.** Who is crawling this page, and
-  which of them ignore the rules. The mechanics are cheap: a `robots.txt` that
-  disallows a path no human can reach, a link to it hidden from sighted readers
-  and from the tab order, and a Vercel function behind it that records the
-  user-agent, IP and timestamp. A person never follows it. A well-behaved
-  crawler reads `robots.txt` and stays out. Anything left in the log either
-  ignored `robots.txt` or does not read it — which is the interesting set.
-
-  Two notes for whoever builds it. The name collides: `api/subscribe.js`
-  already has a honeypot, the hidden `company` field, and that one is a spam
-  filter rather than a census — pick distinct names or the two get confused.
-  And this needs no model and no API key, so it sits inside the project's
-  existing rules rather than against them; the only new cost is one more
-  function and somewhere to keep the log.
+- **Fold the page into masonequitypartners.com as a tab, if it earns the
+  traffic.** It lives at `radar.masonequitypartners.com` — its own Vercel
+  project, independently deployable, which is what the nightly launchd job
+  depends on. A subdomain does not inherit the main domain's search authority
+  the way a path would, so if the page starts pulling real traffic it is worth
+  moving to `masonequitypartners.com/socal-cre-radar` behind a Vercel rewrite
+  from the website project. Both are on Vercel, so the routing is the easy
+  part. Two things are not: `SUBSCRIBE_ENDPOINT` in `site.py` is the absolute
+  `/api/subscribe` and would have to carry the path prefix or the form posts
+  into the main site and 404s; and the website post-processes its own Vercel
+  output config (`scripts/vercel-headers.mjs`), so the rewrite needs testing
+  against that rather than assuming. Deferred deliberately — coupling the two
+  projects means a change to the website's routing can silently break this
+  page, and that is a bad trade until the traffic justifies it.
 
 - **Weekly: check the newsletter stats.** Opens, clicks and unsubscribes in
   beehiiv, read against what actually went out. Nothing in this repo does it or

@@ -37,7 +37,7 @@ const FALLBACK_URL = process.env.BEEHIIV_SUBSCRIBE_URL || '';
 
 // How the signup is tagged inside beehiiv, so cre-radar traffic stays
 // separable from the firm's site even though it is now its own publication.
-const UTM = { source: 'cre-radar.vercel.app', medium: 'cre-radar' };
+const UTM = { source: 'radar.masonequitypartners.com', medium: 'cre-radar' };
 
 // Deliberately loose. An address is verified by mail reaching it, not by a
 // regex; this only catches a visitor who typed their name into the wrong box.
