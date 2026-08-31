@@ -65,7 +65,7 @@ def test_nav_carries_both_entry_points(page):
     assert 'data-drawer="aboutDrawer"' in page
     assert 'data-drawer="subscribeDrawer"' in page
     assert ">About</button>" in page
-    assert ">Subscribe</button>" in page
+    assert "Get Events in your Inbox</button>" in page
 
 
 def test_toggles_declare_what_they_control(page):
@@ -123,6 +123,27 @@ def test_token_round_trips_the_way_the_browser_decodes_it(page):
 
 def test_no_js_fallback_is_readable_but_not_a_regex_match(page):
     assert "radar at example dot com" in page
+
+
+def test_no_js_fallback_lives_in_noscript(page):
+    """The link's visible content is an icon once the script runs. The spelled
+    address has to stay reachable for the reader who never gets that far."""
+    assert "<noscript>radar at example dot com</noscript>" in page
+
+
+def test_icon_only_links_carry_an_accessible_name(page):
+    """An anchor whose only child is a decorative SVG announces as nothing."""
+    assert 'aria-label="LinkedIn"' in page
+    assert 'aria-label="Email"' in page
+    assert page.count('aria-hidden="true"') >= 2
+
+
+def test_the_mail_label_is_generic_until_the_script_decodes_it(page):
+    """`aria-label` is page source like any other attribute. The real address
+    goes in only at runtime, or the encoding was pointless."""
+    label = re.search(r'id="mail"[^>]*aria-label="([^"]+)"', page).group(1)
+    assert label == "Email"
+    assert "aria-label', address" in page   # ...and the script replaces it
 
 
 def test_jsonld_carries_attribution_but_never_the_address(page):

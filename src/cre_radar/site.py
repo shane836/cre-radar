@@ -108,6 +108,26 @@ def _mail_spelled(address: str) -> str:
     return f"{local} at {domain.replace('.', ' dot ')}"
 
 
+# Inline SVG rather than an icon font or a sprite URL: the page's
+# zero-external-requests property is the whole reason the mark is base64'd too.
+# Both are filled paths on `currentColor`, so they pick up the pill's hover
+# colour without a second rule.
+_ICON_LINKEDIN = (
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    '<path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 '
+    '2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 '
+    '5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 '
+    '20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 '
+    '1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>'
+)
+_ICON_MAIL = (
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    '<path d="M3 5h18a1 1 0 0 1 1 1v.4l-9.48 6.09a1 1 0 0 1-1.04 0L2 6.4V6a1 1 0 0 1 '
+    '1-1zm19 3.58V18a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8.58l8.94 5.74a3 3 0 0 0 3.12 '
+    '0L22 8.58z"/></svg>'
+)
+
+
 def _jsonld() -> str:
     """schema.org attribution, so `who built this` is machine-answerable too.
 
@@ -190,7 +210,8 @@ def _nav() -> str:
         '<button class="navlink" data-drawer="aboutDrawer" '
         'aria-controls="aboutDrawer" aria-expanded="false">About</button>'
         '<button class="navcta" data-drawer="subscribeDrawer" '
-        'aria-controls="subscribeDrawer" aria-expanded="false">Subscribe</button>'
+        'aria-controls="subscribeDrawer" aria-expanded="false">'
+        "Get Events in your Inbox</button>"
         "</div></nav>"
     )
 
@@ -227,16 +248,25 @@ def _subscribe() -> str:
 
 def _about(source_count: int) -> str:
     """Who made this, why it exists, and how to reach him."""
+    # Icon-only, so each needs an `aria-label`: an anchor whose only content is
+    # a decorative SVG has no accessible name at all. The mail label stays the
+    # generic "Email" in the source — putting the address there would hand it
+    # straight back to the harvesters `_mail_token` exists to defeat — and the
+    # script swaps in the real one once it has decoded it.
     links = ""
     if LINKEDIN_URL:
         links += (
-            f'<a href="{_esc(LINKEDIN_URL)}" target="_blank" rel="noopener">'
-            "LinkedIn</a>"
+            f'<a class="icon" href="{_esc(LINKEDIN_URL)}" target="_blank" '
+            f'rel="noopener" aria-label="LinkedIn">{_ICON_LINKEDIN}</a>'
         )
     if CONTACT_EMAIL:
+        # The spelled fallback moves inside <noscript>: with the script running
+        # the icon is the whole link, and without it the reader still gets a
+        # readable address instead of an envelope that does nothing.
         links += (
-            f'<a class="mail" id="mail" data-a="{_mail_token(CONTACT_EMAIL)}" '
-            f'rel="nofollow">{_esc(_mail_spelled(CONTACT_EMAIL))}</a>'
+            f'<a class="icon mail" id="mail" data-a="{_mail_token(CONTACT_EMAIL)}" '
+            f'rel="nofollow" aria-label="Email">{_ICON_MAIL}'
+            f"<noscript>{_esc(_mail_spelled(CONTACT_EMAIL))}</noscript></a>"
         )
 
     # The colon only makes sense when there is something below it to point at.
@@ -249,7 +279,8 @@ def _about(source_count: int) -> str:
         "estate event calendars for relevant events.</p>"
         f'<p class="by">Built by <strong>{_esc(BUILDER)}</strong>, {_esc(BUILDER_ROLE)} '
         f'at <a href="{_esc(FIRM_URL)}" target="_blank" rel="noopener">'
-        f"{_esc(FIRM)}</a>. Send bug reports and event suggestions to {reach}</p>"
+        f"{_esc(FIRM)}</a>.</p>"
+        f"<p>Send bug reports and event suggestions to {reach}</p>"
         + (f'<p class="links">{links}</p>' if links else ""),
     )
 
@@ -362,6 +393,10 @@ h1{{font-size:24px;letter-spacing:-.01em;margin-bottom:4px}}
 .brand:hover{{color:var(--accent)}}
 @media (max-width:560px){{
   .brand{{font-size:0;padding:0;margin:0 auto 0 0;border:0}}
+  /* The CTA label is long enough to push the bar past a narrow phone once the
+     brand has collapsed. Trimming it here beats wrapping a sticky navbar. */
+  .navcta{{font-size:12.5px;padding:7px 11px}}
+  .navlink{{padding:7px 9px}}
 }}
 .navlink{{font-size:13.5px;color:var(--ink);text-decoration:none;padding:7px 12px;
   border-radius:999px;font-family:inherit;background:none;border:0;cursor:pointer}}
@@ -390,6 +425,9 @@ h1{{font-size:24px;letter-spacing:-.01em;margin-bottom:4px}}
   border:1px solid var(--line);border-radius:999px;padding:6px 14px;
   font-size:13px;text-decoration:none;color:var(--ink)}}
 .links a[href]:hover{{border-color:var(--accent);color:var(--accent)}}
+.links a{{gap:7px}}
+.links a.icon{{padding:7px 12px}}
+.links a svg{{width:16px;height:16px;display:block;fill:currentColor}}
 /* No href until the script runs, so it must not pretend to be clickable.
    Kept at full --ink: --dim on --head is 3.8:1 in light mode, and this is the
    state a reader with JS disabled is stuck with. Only the cursor differs. */
@@ -460,12 +498,14 @@ if (wanted === 'about' || wanted === 'subscribe') {{
 
 // Rebuild the contact address. It ships reversed-then-base64'd, so it is not in
 // the source in any form a harvester's regex matches. Until this runs the link
-// has no href and reads as "name at host dot com" — degraded, never broken.
+// has no href and its <noscript> spells the address out — degraded, never broken.
+// Sets the label rather than the text: the text is the envelope icon.
 const mail = document.getElementById('mail');
 if (mail) {{
   const address = atob(mail.dataset.a).split('').reverse().join('');
   mail.href = 'mailto:' + address;
-  mail.textContent = address;
+  mail.title = address;
+  mail.setAttribute('aria-label', address);
 }}
 </script>
 </body></html>"""
