@@ -22,6 +22,8 @@ uv run cre-radar digest --dry-run   # safe: renders without delivering
 
 ## Architecture
 
+Full map — directories, modules, schema, invariants: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 Every stream enters through the adapter contract in `contracts.py`, ported from
 `sf-events-aggregator`. Read that and `identity.py` before touching ingestion.
 `rubrics/milestone-contract.md` is the PGE rubric the tests implement — add a

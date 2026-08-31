@@ -62,11 +62,11 @@ def harvest(
 ) -> SourceResult:
     """Fetch, normalize, and persist one source.
 
-    Fetching is cheap; extraction is the model call and the whole cost of running
-    this, so the adapter compares the page's link fingerprint against the last
-    successful extraction and skips the model when the calendar is unchanged.
-    ``force=True`` re-extracts regardless — use it after editing the extraction
-    prompt, or on a weekly cron to catch detail-only edits.
+    Extraction is the expensive half — a browser render for several sources — so
+    the adapter compares the page's link fingerprint against the last successful
+    extraction and skips the whole thing when the calendar is unchanged.
+    ``force=True`` re-extracts regardless: use it after editing `heuristic.py`,
+    or on a weekly cron to catch detail-only edits.
     """
     known = None if force else db.last_page_hash(conn, source.slug)
     try:
@@ -79,7 +79,7 @@ def harvest(
 
         # A source that produced nothing *and* reported an error failed, whatever
         # stage it failed at. Reporting that as a clean "+0 new" is the silent
-        # failure the run log exists to prevent: a dead model call and a quiet
+        # failure the run log exists to prevent: a bot interstitial and a quiet
         # week look identical from the digest.
         if result.errors and not result.events:
             first = result.errors[0].message

@@ -1,12 +1,12 @@
-"""Getting a page, and turning it into something worth sending to a model.
+"""Getting a page, and turning it into something the extractor can read.
 
 Two fetch modes — plain HTTP, and a real headless browser for the sites that
 either need JavaScript or reject non-browser clients (Bisnow, ICSC, ULI, Connect
 CRE, Eventbrite, Luma all do one or the other).
 
 :func:`condense` is the piece that makes generic extraction work: it throws away
-chrome and markup but *keeps anchor hrefs inline*, so the model can return a real
-ticket/registration URL for every event instead of inventing one.
+chrome and markup but *keeps anchor hrefs inline*, so every extracted event
+carries a real ticket/registration URL rather than a guess at one.
 """
 from __future__ import annotations
 
@@ -21,16 +21,16 @@ UA = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
-# Chrome that never contains an event and only costs tokens.
+# Chrome that never contains an event and only adds noise to the extraction.
 #
 # `form` is deliberately NOT here: ASP.NET WebForms wraps the entire page body in
 # a single <form runat="server">, so stripping it deletes the whole page. That bug
 # silently reduced selfstorage.org from 243KB to just its <title>.
 _STRIP_TAGS = ("script", "style", "noscript", "svg", "nav", "footer", "header")
 
-# Generous — a 1M-context model swallows any real event page whole. Pages larger
-# than this are truncated, and the caller reports it rather than silently losing
-# events off the end.
+# Generous — no real event calendar condenses to anywhere near this. Pages
+# larger than this are truncated, and the caller reports it rather than silently
+# losing events off the end.
 MAX_CHARS = 200_000
 
 
@@ -98,8 +98,8 @@ def condense(html: str, base_url: str) -> tuple[str, bool]:
     """Reduce a page to link-annotated plain text. Returns (text, was_truncated).
 
     Anchors survive as ``[label](absolute-url)`` because the URL is the one field
-    the model must never hallucinate — every event needs a working link back to
-    its source.
+    that cannot be reconstructed from the text — every event needs a working link
+    back to its source.
     """
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(_STRIP_TAGS):

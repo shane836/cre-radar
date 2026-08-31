@@ -1,7 +1,7 @@
 """The event-source registry, loaded from the editable `sources.toml`.
 
 Sources are data, not code: adding one is a four-line TOML block, because the
-extraction step is generic (see :mod:`cre_radar.extract`).
+extraction step is generic (see :mod:`cre_radar.heuristic`).
 """
 from __future__ import annotations
 

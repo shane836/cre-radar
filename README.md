@@ -34,6 +34,9 @@ sources.toml ─► fetch ─► condense ─► heuristic extract ─► RawEve
   Vercel site     email      Obsidian note
 ```
 
+Directory-by-directory map, module responsibilities, the storage schema and the
+invariants: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 Four choices carry most of the weight:
 
 **Extraction is generic, not per-site.** Pages are reduced to link-annotated text,
@@ -172,14 +175,15 @@ you if you have walked the judgment back.
 
 ## Sources
 
-17 enabled, 2 disabled. `sources check` reports **condensed characters**, not HTTP
+20 enabled, 2 disabled. `sources check` reports **condensed characters**, not HTTP
 status — a 200 serving a bot interstitial looks identical to a healthy fetch at
 the transport layer, and that distinction is the whole point.
 
 | Mode | Count | Sources |
 |---|---|---|
-| `html` | 10 | NAIOP SoCal, CREW LA, USC Lusk, AIR CRE, IREM, AAGLA, CSSA, SSA, CCA, BREAA |
-| `browser` | 7 | BOMA GLA, ICSC, Eventbrite, Luma LA, Luma PropTech, Bisnow, Connect CRE |
+| `html` | 11 | NAIOP SoCal, CREW LA, USC Lusk, AIR CRE, IREM, AAGLA, CSSA, SSA, CCA, BREAA, UCLA Anderson |
+| `browser` | 8 | BOMA GLA, ICSC, USC Alumni, Eventbrite, Luma LA, Luma PropTech, Bisnow, Connect CRE |
+| `rss` | 1 | Berkeley Haas Alumni |
 | disabled | 2 | ULI LA (Cloudflare challenge), LABC (hard 403) |
 
 Both disabled sources keep their entry and the reason, since a challenge policy
@@ -220,7 +224,7 @@ an 18:00 PT event to the next day.
 `rubrics/milestone-contract.md` follows the PGE method from
 `sf-events-aggregator/docs/pge-rubric-guide-for-claude.md`: each dimension names
 one specific failure mode and checks it deterministically — a test, a grep, or an
-exit code, never a judgment call. The 58 tests implement it dimension by
+exit code, never a judgment call. The 118 tests implement it dimension by
 dimension, and the heuristic tests run against real pages captured in `fixtures/`.
 
 ## What to edit
@@ -274,7 +278,9 @@ never deployed.
 
 ## Layout
 
-Every module, in roughly the order data moves through them.
+[`ARCHITECTURE.md`](ARCHITECTURE.md) is the full map — every directory, every
+module, the storage schema, and the invariants with the test that enforces each.
+The short version:
 
 ```
 sources.toml              the source registry — edit to add a source
@@ -285,39 +291,16 @@ public/index.html         the generated site — output, never edit by hand
 rubrics/                  the PGE rubric the tests implement
 fixtures/                 real pages, for offline extraction tests
 scripts/                  install-cron.sh, rebuild.sh
-tests/                    97+ tests; conftest.py builds contract objects
+tests/                    118 tests; conftest.py builds contract objects
 
 src/cre_radar/
-  cli.py                  the command surface. `run` is what cron calls.
-  config.py               every setting, read from the environment / .env
-  doctor.py               pre-flight: "will `run` work, and if not, why"
-
-  — ingestion —
-  contracts.py            the frozen adapter interface — read this first
-  sources/registry.py     loads sources.toml into Source objects
-  events.py               the harvest runner; drives every adapter
-  fetch.py                HTTP + headless fetch, condense, link_fingerprint
-  adapters/page.py        fetch + condense + extract (most sources)
-  adapters/feed.py        iCal / RSS, the zero-extraction path
-  adapters/timeparse.py   a source's date string -> aware UTC datetime
-  heuristic.py            the pattern extractor. No model, no key.
-  places.py               works out the city from whatever text a listing gives
-
-  — identity and storage —
-  identity.py             fingerprinting + timezone-correct local time. Pure.
-  models.py               the typed contracts both pipelines share
-  persist.py              THE single writer. Dedupe + winner rule.
-  db.py                   schema, URL normalization, reads
-
-  — scoring —
-  scoring.py              applies scoring.toml. Pure.
-  score.py                walks unjudged rows through scoring.py
-
-  — output —
-  site.py                 the public page (see the section above)
-  digest/render.py        the email + note layout
-  digest/email.py         sends through Resend
-  digest/obsidian.py      writes the dated vault note
+  cli.py, config.py, doctor.py    command surface, settings, pre-flight
+  contracts.py                    the frozen adapter interface — read first
+  sources/, adapters/, events.py  the registry, the streams, the harvest runner
+  fetch.py, heuristic.py          get a page; read events out of it
+  identity.py, persist.py, db.py  fingerprinting, the single writer, storage
+  scoring.py, score.py            apply scoring.toml
+  site.py, digest/                the page, the email, the vault note
 ```
 
 **Four files carry the rules worth knowing before editing:** `contracts.py`

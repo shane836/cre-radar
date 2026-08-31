@@ -1,8 +1,8 @@
-"""iCal and RSS adapter — the deterministic, zero-token path.
+"""iCal and RSS adapter — the zero-extraction path.
 
-No model call: the feed already is structured data. When a source publishes one,
-prefer it over `LlmPageAdapter` on both cost and reliability. Same contract, so
-the runner and persister cannot tell the difference.
+Nothing is parsed out of prose: the feed already is structured data. When a
+source publishes one, prefer it over `PageAdapter` on reliability. Same contract,
+so the runner and persister cannot tell the difference.
 """
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ class FeedAdapter:
         return FetchResult(events=events, errors=errors, fetched_at=now)
 
     def normalize(self, raw: RawEvent, provenance: Provenance) -> NormalizedEvent:
-        """Pure. Identical to the LLM adapter's — the contract is what differs, not this."""
+        """Pure. Identical to `PageAdapter`'s — the fetch differs, not this."""
         return NormalizedEvent(
             canonical_fingerprint=fingerprint(
                 title=raw.title, venue_name=raw.venue.name,

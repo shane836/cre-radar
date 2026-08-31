@@ -1,11 +1,10 @@
-"""A no-model event extractor, for fully unattended runs.
+"""The event extractor. No model, no API key — pattern matching and nothing else.
 
 Event listings share a shape: a date, then a linked title, then a time range.
 This exploits that and nothing else. Measured against pages verified by hand, it
 recovers every real event on well-structured calendars (NAIOP, CSSA) and adds
-noise on messier ones — so it is the **fallback**, used when nobody is around to
-read the pages. `collect` writes the same JSON either way, so the rest of the
-pipeline cannot tell which produced it.
+noise on messier ones, which `scoring.toml` then sorts out. That noise is the
+price of having no per-site parser in the repo.
 
 Two failure modes are handled explicitly because they were observed, not
 imagined:
@@ -27,7 +26,7 @@ imagined:
 * **Undated nav lists.** BREAA's sidebar is thirty links with no dates near them,
   which is indistinguishable from thirty undated events. Since this extractor
   cannot tell them apart, it requires a date. A genuinely undated event is lost
-  — the reader-driven path catches those, and a nav menu in the digest is worse.
+  — a nav menu in the digest is worse than one missed undated event.
 """
 from __future__ import annotations
 

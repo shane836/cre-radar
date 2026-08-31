@@ -47,7 +47,7 @@ def rank(level: VerificationLevel) -> int:
 class ExternalIdentity:
     """Layer 1 identity: stable per source. Answers "have I seen this row before"."""
 
-    source: str          # 'llm:naiop-socal' | 'ical:usc-lusk'
+    source: str          # 'page:naiop-socal' | 'feed:haas-alumni'
     external_id: str     # stable per source; the source URL when nothing better exists
     source_url: str      # click-through. REQUIRED on every event.
     source_version: str | None = None
@@ -166,7 +166,7 @@ class NormalizedEvent:
 
 @runtime_checkable
 class SourceAdapter(Protocol):
-    """Every stream — LLM extraction, iCal, RSS, a future API — implements this."""
+    """Every stream — page extraction, iCal, RSS, a future API — implements this."""
 
     id: str
     tier: SourceTier
