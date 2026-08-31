@@ -1,7 +1,14 @@
 # CLAUDE.md — cre-radar
 
-Finds LA commercial real estate events, scores them against `scoring.toml`, and
-delivers a daily email + Obsidian note. Full design: [`README.md`](README.md).
+Finds Southern California commercial real estate events, scores them against
+`scoring.toml`, and delivers a daily email + Obsidian note. Full design:
+[`README.md`](README.md).
+
+**`cre-radar` is the command; `SoCal CRE Events` is the product.** The public
+name lives in `APP_NAME` (`src/cre_radar/__init__.py`), imported by `site.py`
+and `digest/render.py`, and repeated once in `api/subscribe.js` because that
+file is not Python. Do not hardcode it anywhere else, and do not rename the
+CLI, the repo or the cron entry to match it.
 
 **This app uses no model and no API key at runtime, by design.** Do not
 reintroduce one. Extraction is `heuristic.py`; scoring is `scoring.toml`.
@@ -130,6 +137,13 @@ Four things in that function are load-bearing:
 - **The `company` field is a honeypot**, positioned off-screen rather than
   `display:none` — a bot that skips hidden inputs walks past the trap. A filled
   one gets a cheerful 200 and no subscription.
+
+**The box says "weekly" and nothing sends weekly yet.** beehiiv holds the
+subscribers but has no scheduled send; setting the publication's schedule is
+open work, tracked under *Future scope* in the README. Do not "fix" the copy by
+dropping the cadence — the promise is the point, and the send is what is
+missing. Shane's own daily digest goes through Resend to a named address and is
+a different thing entirely.
 
 **Never let the fallback point at the firm's publication.** `SUBSCRIBE_URL` in
 `site.py` and `BEEHIIV_SUBSCRIBE_URL` in the function both default to empty and

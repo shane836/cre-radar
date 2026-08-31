@@ -21,6 +21,11 @@
 //   SUBSCRIBE_FROM / _TO    optional, with DIGEST_FROM / DIGEST_TO as
 //                           fallbacks. Only used for that copy.
 
+// The product's public name. Duplicated from `src/cre_radar/__init__.py`
+// because this file is the one piece of the project that is not Python; the
+// two must be changed together.
+const APP_NAME = 'SoCal CRE Events';
+
 const BEEHIIV_API = 'https://api.beehiiv.com/v2';
 
 // Where a failed signup is sent instead, so a broken function never costs the
@@ -61,7 +66,7 @@ function htmlPage(heading, body) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapeHtml(heading)} - LA Real Estate Events</title>
+<title>${escapeHtml(heading)} - ${APP_NAME}</title>
 <style>
 :root{color-scheme:light dark;--bg:#f6f7f9;--card:#fff;--line:#e6e6eb;
   --ink:#1b1b20;--dim:#7a7a85;--accent:#1a56b8}

@@ -20,7 +20,7 @@ def page(monkeypatch):
     monkeypatch.setattr(site, "LINKEDIN_URL", "https://www.linkedin.com/in/example/")
     monkeypatch.setattr(site, "CONTACT_EMAIL", "radar@example.com")
     return site.render(
-        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC), source_count=20
+        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
     )
 
 
@@ -99,12 +99,14 @@ def test_about_says_who_built_it_and_where_he_works(page):
     assert "masonequitypartners.com" in page
 
 
-def test_source_count_comes_from_the_registry_not_the_copy(page):
-    """A number typed into prose goes stale the first time a source is added."""
-    assert "20 Southern California" in page
-    other = site.render([], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC),
-                        source_count=31)
-    assert "31 Southern California" in other
+def test_about_is_only_the_two_lines_that_matter(page):
+    """Who built it and how to tell him it is wrong. What the tool does is the
+    listing underneath, which says it better than a sentence of prose."""
+    assert "Every morning this sweeps" not in page
+    assert "event calendars" not in page
+    drawer = page.split('id="aboutDrawer"')[1].split("</div></div>")[0]
+    # `<p[ >]`, not `<p` — the mail icon's SVG is full of `<path`.
+    assert len(re.findall(r"<p[ >]", drawer)) == 3   # by-line, bug reports, links
 
 
 # --- The address must never be scrapeable -----------------------------------
@@ -167,7 +169,7 @@ def test_empty_constants_render_no_link_at_all(monkeypatch):
     monkeypatch.setattr(site, "LINKEDIN_URL", "")
     monkeypatch.setattr(site, "CONTACT_EMAIL", "")
     page = site.render(
-        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC), source_count=20
+        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
     )
 
     assert 'href=""' not in page
@@ -216,7 +218,7 @@ def test_the_hosted_page_is_the_failure_route_only(monkeypatch):
     people — not the first thing the page asks them to click."""
     monkeypatch.setattr(site, "SUBSCRIBE_URL", "https://cre-radar.beehiiv.com/subscribe")
     page = site.render(
-        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC), source_count=20
+        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
     )
 
     assert page.count("cre-radar.beehiiv.com") == 1
@@ -249,8 +251,11 @@ def test_drawer_bodies_are_not_left_in_the_page_flow(page):
     assert page.count("Built by") == 1
 
 
-def test_subscribe_uses_the_sites_own_copy(page):
+def test_subscribe_uses_the_sites_own_copy_and_states_the_cadence(page):
+    """The cadence is the first thing anyone weighing a signup wants to know,
+    and the button cannot say it on its own."""
     assert "Learn how we think" in page
+    assert "<strong>weekly</strong> digest" in page
     assert "notes from the field" in page
     assert "No spam. Unsubscribe anytime." in page
 
@@ -265,9 +270,32 @@ def test_own_form_until_an_embed_is_configured(page):
 def test_embed_replaces_the_form_when_configured(monkeypatch):
     monkeypatch.setattr(site, "BEEHIIV_EMBED_URL", "https://embeds.beehiiv.com/abc")
     page = site.render(
-        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC), source_count=20
+        [], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
     )
 
     assert '<iframe class="embed" src="https://embeds.beehiiv.com/abc"' in page
     assert 'title="Subscribe to the newsletter"' in page   # the a11y name
     assert 'id="joinForm"' not in page
+
+
+# --- The product name is one constant ---------------------------------------
+
+def test_the_public_name_is_on_the_page_in_every_slot(page):
+    assert "<title>SoCal CRE Events</title>" in page
+    assert '<a class="brand" href="#top">SoCal CRE Events</a>' in page
+    assert "Upcoming SoCal CRE Events</h1>" in page
+    assert json.loads(
+        re.search(r'<script type="application/ld\+json">(.*?)</script>', page, re.DOTALL)
+        .group(1)
+    )["name"] == "SoCal CRE Events"
+
+
+def test_renaming_the_product_does_not_rename_the_command(monkeypatch):
+    """`APP_NAME` is the only place the public name is written. `cre-radar` is
+    the repo, the CLI and the cron entry, and must survive a rename."""
+    monkeypatch.setattr(site, "APP_NAME", "Renamed Thing")
+    page = site.render([], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC))
+
+    assert "SoCal CRE Events" not in page
+    assert page.count("Renamed Thing") == 4      # title, brand, h1, json-ld
+    assert "cre-radar" in page                   # the footer credit stands

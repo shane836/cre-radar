@@ -17,8 +17,8 @@ import sqlite3
 from datetime import datetime
 from functools import cache
 
+from . import APP_NAME
 from .digest.render import _local, _meta_parts, group_by_week
-from .sources import registry
 
 # Same palette as the email, so the two read as one product.
 _PILL = {
@@ -161,7 +161,7 @@ def _jsonld() -> str:
     payload = {
         "@context": "https://schema.org",
         "@type": "WebSite",
-        "name": "LA Real Estate Events",
+        "name": APP_NAME,
         "url": SITE_URL,
         "author": person,
     }
@@ -221,7 +221,7 @@ def _nav() -> str:
     return (
         '<nav class="nav"><div class="navin">'
         f"{_logo()}"
-        '<a class="brand" href="#top">LA Real Estate Events</a>'
+        f'<a class="brand" href="#top">{_esc(APP_NAME)}</a>'
         '<button class="navlink" data-drawer="aboutDrawer" '
         'aria-controls="aboutDrawer" aria-expanded="false">About</button>'
         '<button class="navcta" data-drawer="subscribeDrawer" '
@@ -294,14 +294,16 @@ def _subscribe() -> str:
     return _drawer(
         "subscribe",
         "Learn how we think",
-        "<p>For more events in your inbox, plus market observations and notes "
-        "from the field, subscribe here.</p>"
+        # The cadence is the first thing anyone weighing a signup wants to
+        # know, and the one thing the button cannot say on its own.
+        "<p>A <strong>weekly</strong> digest of what is coming up, plus market "
+        "observations and notes from the field.</p>"
         f"{action}"
         '<p class="fine">No spam. Unsubscribe anytime.</p>',
     )
 
 
-def _about(source_count: int) -> str:
+def _about() -> str:
     """Who made this, why it exists, and how to reach him."""
     # Icon-only, so each needs an `aria-label`: an anchor whose only content is
     # a decorative SVG has no accessible name at all. The mail label stays the
@@ -327,11 +329,12 @@ def _about(source_count: int) -> str:
     # The colon only makes sense when there is something below it to point at.
     reach = "the contact below:" if links else "me."
 
+    # Two lines: who built it, and how to tell him it is wrong. What the tool
+    # does is the listing sitting underneath, which says it better than a
+    # sentence of prose can.
     return _drawer(
         "about",
         "About",
-        f"<p>Every morning this sweeps {source_count} Southern California commercial real "
-        "estate event calendars for relevant events.</p>"
         f'<p class="by">Built by <strong>{_esc(BUILDER)}</strong>, {_esc(BUILDER_ROLE)} '
         f'at <a href="{_esc(FIRM_URL)}" target="_blank" rel="noopener">'
         f"{_esc(FIRM)}</a>.</p>"
@@ -356,14 +359,8 @@ def _card(row: sqlite3.Row) -> str:
     )
 
 
-def render(
-    rows: list[sqlite3.Row], *, generated: datetime, source_count: int | None = None
-) -> str:
+def render(rows: list[sqlite3.Row], *, generated: datetime) -> str:
     """One self-contained HTML document. No external assets, no network calls."""
-    # Counted from the registry rather than written into the copy, because a
-    # number typed into prose goes stale the first time a source is added.
-    if source_count is None:
-        source_count = len(registry.load())
     counts = {name: sum(1 for r in rows if r["category"] == name) for name in _ORDER}
     filters = "".join(
         f'<button class="filter" data-filter="{name}">{name.capitalize()}'
@@ -387,9 +384,9 @@ def render(
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LA Real Estate Events</title>
-<meta name="description" content="Upcoming Los Angeles commercial real estate and
-real estate investment events, updated daily.">
+<title>{_esc(APP_NAME)}</title>
+<meta name="description" content="Upcoming Southern California commercial real
+estate and real estate investment events, updated daily.">
 <script>document.documentElement.className='js'</script>
 <script type="application/ld+json">{_jsonld()}</script>
 <style>
@@ -522,9 +519,9 @@ h1{{font-size:24px;letter-spacing:-.01em;margin-bottom:4px}}
 </style></head><body>
 {_nav()}
 {_subscribe()}
-{_about(source_count)}
+{_about()}
 <div class="wrap" id="top">
-<h1>&#128197; Upcoming LA Real Estate Events</h1>
+<h1>&#128197; Upcoming {_esc(APP_NAME)}</h1>
 <p class="sub">{len(rows)} events &middot; updated {generated.strftime('%-d %b %Y, %H:%M')} PT</p>
 <div class="filters">
 <button class="filter" data-filter="all" aria-pressed="true">All<span class="count">{len(rows)}</span></button>

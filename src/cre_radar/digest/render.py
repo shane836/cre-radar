@@ -14,6 +14,7 @@ import json
 import sqlite3
 from datetime import date, datetime, timedelta
 
+from .. import APP_NAME
 from ..identity import format_local_minute
 
 DEFAULT_TZ = "America/Los_Angeles"
@@ -161,7 +162,7 @@ def html_email(rows: list[sqlite3.Row], *, day: date) -> str:
         f'<div style="{font};background:#f6f7f9;padding:24px 12px;margin:0">',
         '<div style="max-width:600px;margin:0 auto">',
         ('<div style="font-size:23px;font-weight:700;color:#1b1b20;margin:0 0 4px">'
-         "&#128197;&nbsp; Upcoming LA Real Estate Events</div>"),
+         f"&#128197;&nbsp; Upcoming {_esc(APP_NAME)}</div>"),
         ('<div style="font-size:13px;color:#7a7a85;margin:0 0 18px">'
          f'{day.strftime("%A, %-d %B %Y")} &middot; {len(rows)} events</div>'),
     ]
@@ -219,7 +220,7 @@ def markdown(rows: list[sqlite3.Row], *, day: date) -> str:
         f"date: {day.isoformat()}",
         "---",
         "",
-        "# 📅 Upcoming LA Real Estate Events",
+        f"# 📅 Upcoming {APP_NAME}",
         "",
         f"*{day.strftime('%A, %-d %B %Y')} · {len(rows)} events*",
         "",

@@ -1,8 +1,15 @@
 # cre-radar
 
-Sweeps 20 Los Angeles commercial real estate event sources every morning, scores
-what it finds against your rules, and publishes what's worth your calendar three
-ways: a **live site**, an email, and a dated Obsidian note.
+Sweeps 20 Southern California commercial real estate event sources every
+morning, scores what it finds against your rules, and publishes what's worth
+your calendar three ways: a **live site**, an email, and a dated Obsidian note.
+
+`cre-radar` is the repo, the CLI and the cron entry. **SoCal CRE Events** is
+what a reader sees — the page title, the navbar, the email heading. The two
+names are kept apart on purpose: `APP_NAME` in `src/cre_radar/__init__.py` is
+the only place the public one is written (and once more, unavoidably, in
+`api/subscribe.js`, which is not Python). Renaming the product must never mean
+renaming the command.
 
 **Live:** https://cre-radar.vercel.app
 
@@ -68,9 +75,10 @@ hasn't changed, nothing is re-extracted.
 ## The public page
 
 A sticky navbar carries **About** and **Subscribe**, each opening a drawer
-beneath it — what the tool does, who it filters for and who built it, plus a
-mailing-list block using the copy from masonequitypartners.com. The listing
-stays the page; the rest is one click away.
+beneath it. About is two lines — who built it, and how to report a bug or
+suggest an event. Subscribe is the mailing-list block. The listing *is* the
+page and says what the tool does better than a paragraph could; everything else
+is one click away.
 
 Both drawers render open and an inline `<head>` script collapses them, so the
 content is still reachable with JS disabled. A closed drawer is
@@ -81,7 +89,9 @@ base64'd and the script rebuilds it on load, so a harvester scanning for
 `user@host.tld` finds nothing; readers without JS get `name at host dot com`.
 Publish a forwarding alias here, not the primary work address.
 
-The mailing-list block is a field and a **Subscribe** button. It posts to
+The mailing-list block is a field and a **Subscribe** button, and says the
+newsletter is **weekly** — the cadence is the first thing anyone weighing a
+signup wants to know, and the button cannot say it alone. It posts to
 `api/subscribe.js` on this same site, which creates the subscription on
 cre-radar's **own beehiiv publication** through beehiiv's v2 API, tagged
 `utm_medium=cre-radar`. Nothing is stored in this repo — beehiiv is the list.
@@ -176,6 +186,19 @@ machine).
 vercel login                        # once
 uv run cre-radar publish --deploy
 ```
+
+## Future scope
+
+Things known to be missing, kept here rather than in someone's head.
+
+- **Set the beehiiv newsletter to send weekly.** The signup box now promises a
+  weekly digest, and nothing yet fulfils it: beehiiv holds the subscribers but
+  has no scheduled send. Set the publication's send schedule to weekly (or wire
+  the digest to beehiiv's Send API, which needs the Max plan). Until that is
+  done the page is making a promise the system does not keep — this is the one
+  item on this list with a deadline attached to it.
+- Shane's own digest stays daily and is unrelated: it goes through Resend to a
+  named address, not through beehiiv.
 
 ## Tuning
 

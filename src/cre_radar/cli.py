@@ -13,7 +13,7 @@ from .fetch import condense, fetch_rendered, fetch_static
 from .sources.registry import load as load_sources
 
 app = typer.Typer(
-    help="Find LA commercial real estate and real estate investment events.",
+    help="Find Southern California commercial real estate and real estate investment events.",
     no_args_is_help=True,
 )
 sources_app = typer.Typer(help="Inspect and check the event source registry.")
