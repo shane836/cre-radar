@@ -292,7 +292,7 @@ def test_the_public_name_is_on_the_page_in_every_slot(page):
 def test_the_heading_is_not_the_product_name(page):
     """"Upcoming CRE Events Radar" does not read as English. The listing shows
     upcoming events; the product is called the radar. Two strings, on purpose."""
-    assert "Upcoming CRE Events</h1>" in page
+    assert "Upcoming SoCal CRE Events</h1>" in page
     assert "Upcoming CRE Events Radar" not in page
 
 

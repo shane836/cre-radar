@@ -17,4 +17,4 @@ APP_NAME = "CRE Events Radar"
 # on purpose: the name reads as a name, but "Upcoming CRE Events Radar" does
 # not read as English. What the page shows is upcoming events; what the product
 # is called is the radar.
-HEADING = "Upcoming CRE Events"
+HEADING = "Upcoming SoCal CRE Events"
