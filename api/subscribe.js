@@ -1,13 +1,28 @@
 // The only server-side code in this project.
 //
 // The page is otherwise a static file. This exists because a static page
-// cannot subscribe anyone to beehiiv on its own: `/create` needs a per-session
-// `visit_token` it cannot mint, and `/subscribe?email=` does not prefill, so a
-// hand-rolled field would make the visitor type the address twice. Beehiiv's
-// v2 API has no such problem — it just needs a key, which means a server.
+// cannot put anyone on a mailing list on its own: an ESP's hosted signup page
+// is a handoff that loses people, and beehiiv's in particular cannot be posted
+// to from a hand-rolled field (`/create` needs a per-session `visit_token` a
+// static page cannot mint, and `/subscribe?email=` does not prefill, so the
+// visitor types the address twice). An API has no such problem — it just needs
+// a key, which means a server.
 //
-// So the box posts here, and this creates the subscription on cre-radar's own
-// beehiiv publication. Nothing is stored in this repo: beehiiv is the list.
+// So the box posts here, and this puts the address on the list.
+//
+// **MailerLite is the list that matters.** It is what actually sends the weekly
+// issue (`digest/newsletter.py`), on the same authenticated sending domain the
+// firm is warming for its own blast — one domain, one reputation, one warm-up.
+// The two audiences stay apart as two *groups* inside one account, which is why
+// MAILERLITE_GROUP_ID is not optional: without it a signup would land in the
+// account rather than in the events group.
+//
+// beehiiv is kept as a **mirror only**, and only while the migration is in
+// flight. It cannot send — the cre-radar publication is on the free plan and
+// beehiiv's Create Post endpoint is Max/Enterprise — so a failure there is
+// logged and never surfaced. Once the existing subscribers are moved across,
+// delete the two BEEHIIV_ variables from the Vercel project and this whole leg
+// goes quiet on its own, with no code change.
 //
 // Runs on the Node.js runtime (Fluid Compute, the default). No dependencies:
 // `fetch` is built in, and Vercel parses JSON and form-encoded bodies into
@@ -15,8 +30,10 @@
 //
 // Environment, set on the **Vercel project** (the local `.env` is not
 // deployed):
-//   BEEHIIV_API_KEY         required. beehiiv -> Settings -> API.
-//   BEEHIIV_PUBLICATION_ID  required. The cre-radar publication, `pub_...`.
+//   MAILERLITE_API_KEY      required. MailerLite -> Integrations -> API.
+//   MAILERLITE_GROUP_ID     required. The cre-radar group, NOT the associates one.
+//   BEEHIIV_API_KEY         optional, transitional. The mirror above.
+//   BEEHIIV_PUBLICATION_ID  optional, transitional. The cre-radar publication.
 //   RESEND_API_KEY          optional. Adds a copy to the radar alias.
 //   SUBSCRIBE_FROM / _TO    optional, with DIGEST_FROM / DIGEST_TO as
 //                           fallbacks. Only used for that copy.
@@ -27,6 +44,7 @@
 const APP_NAME = 'SoCal CRE Events';
 
 const BEEHIIV_API = 'https://api.beehiiv.com/v2';
+const MAILERLITE_API = 'https://connect.mailerlite.com/api';
 
 // Where a failed signup is sent instead, so a broken function never costs the
 // visitor the signup. The cre-radar publication's own hosted page — never the
@@ -35,8 +53,8 @@ const BEEHIIV_API = 'https://api.beehiiv.com/v2';
 // than ship a wrong or dead one.
 const FALLBACK_URL = process.env.BEEHIIV_SUBSCRIBE_URL || '';
 
-// How the signup is tagged inside beehiiv, so cre-radar traffic stays
-// separable from the firm's site even though it is now its own publication.
+// How the signup is tagged on the list, so cre-radar traffic stays separable
+// from the firm's own inside a shared MailerLite account.
 const UTM = { source: 'radar.masonequitypartners.com', medium: 'cre-radar' };
 
 // Deliberately loose. An address is verified by mail reaching it, not by a
@@ -101,9 +119,9 @@ function reply(req, res, status, message, { heading, extra = '' } = {}) {
     .send(htmlPage(heading || message, `<p>${escapeHtml(message)}</p>${extra}`));
 }
 
-/** A copy to the radar alias, so a signup is visible without opening beehiiv.
+/** A copy to the radar alias, so a signup is visible without opening the ESP.
  *
- * Best-effort by design: beehiiv already has the subscriber by the time this
+ * Best-effort by design: the list already has the subscriber by the time this
  * runs, so a mail failure must not turn a successful signup into an error. It
  * is logged, never surfaced.
  */
@@ -126,13 +144,13 @@ async function notify(email, status, referer) {
         reply_to: email,        // Replying reaches the subscriber, not you.
         subject: `cre-radar signup: ${email}`,
         text: [
-          `${email} subscribed to the cre-radar publication.`,
+          `${email} joined the cre-radar list.`,
           '',
           `Status: ${status}`,
           `When:   ${new Date().toISOString()}`,
           `Page:   ${referer || 'cre-radar'}`,
           '',
-          'They are already in beehiiv — this is a receipt, not a to-do.',
+          'They are already on the list — this is a receipt, not a to-do.',
         ].join('\n'),
       }),
     });
@@ -142,6 +160,51 @@ async function notify(email, status, referer) {
     }
   } catch (error) {
     console.error('subscribe: receipt not sent -', error);
+  }
+}
+
+/** Keep beehiiv in step while the list is being moved off it.
+ *
+ * Best-effort on purpose, the same way `notify` is: MailerLite already has the
+ * subscriber by the time this runs and is the thing that sends, so a beehiiv
+ * failure is a stale mirror, not a lost signup. Turning it into an error would
+ * report a successful subscription as a failure.
+ *
+ * Unset BEEHIIV_ variables are the expected end state, not a misconfiguration —
+ * that is how this leg is retired.
+ */
+async function mirrorToBeehiiv(email, referer) {
+  const key = process.env.BEEHIIV_API_KEY;
+  const publication = process.env.BEEHIIV_PUBLICATION_ID;
+  if (!key || !publication) return;
+
+  try {
+    const response = await fetch(
+      `${BEEHIIV_API}/publications/${encodeURIComponent(publication)}/subscriptions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          // An address that unsubscribed once has to opt in again on purpose.
+          reactivate_existing: false,
+          // MailerLite sends the welcome now. Two would be a mess.
+          send_welcome_email: false,
+          utm_source: UTM.source,
+          utm_medium: UTM.medium,
+          referring_site: referer || undefined,
+        }),
+      }
+    );
+    if (!response.ok) {
+      console.error('subscribe: beehiiv mirror failed -', response.status,
+                    await response.text().catch(() => '<unreadable>'));
+    }
+  } catch (error) {
+    console.error('subscribe: beehiiv mirror failed -', error);
   }
 }
 
@@ -167,15 +230,15 @@ module.exports = async (req, res) => {
     });
   }
 
-  const key = process.env.BEEHIIV_API_KEY;
-  const publication = process.env.BEEHIIV_PUBLICATION_ID;
+  const mlKey = process.env.MAILERLITE_API_KEY;
+  const mlGroup = process.env.MAILERLITE_GROUP_ID;
 
   // No silent failures: a missing key is a deployment mistake, and swallowing
   // it would drop real signups behind a thank-you the visitor believes.
-  if (!key || !publication) {
+  if (!mlKey || !mlGroup) {
     console.error(
       'subscribe: not configured -',
-      [!key && 'BEEHIIV_API_KEY', !publication && 'BEEHIIV_PUBLICATION_ID']
+      [!mlKey && 'MAILERLITE_API_KEY', !mlGroup && 'MAILERLITE_GROUP_ID']
         .filter(Boolean).join(', '),
       'missing'
     );
@@ -186,27 +249,26 @@ module.exports = async (req, res) => {
 
   let response;
   try {
-    response = await fetch(
-      `${BEEHIIV_API}/publications/${encodeURIComponent(publication)}/subscriptions`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          // An address that unsubscribed once has to opt in again on purpose.
-          reactivate_existing: false,
-          send_welcome_email: true,
-          utm_source: UTM.source,
-          utm_medium: UTM.medium,
-          referring_site: req.headers.referer || undefined,
-        }),
-      }
-    );
+    // Upserts: 201 for a new subscriber, 200 for one already there. Either is
+    // a success, so a visitor who signs up twice sees a thank-you rather than
+    // an error about a problem that is not theirs.
+    response = await fetch(`${MAILERLITE_API}/subscribers`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${mlKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        groups: [mlGroup],
+        // Carried across from beehiiv so cre-radar signups stay separable from
+        // the firm's own traffic inside a shared account.
+        fields: { source: UTM.source, medium: UTM.medium },
+      }),
+    });
   } catch (error) {
-    console.error('subscribe: beehiiv unreachable -', error);
+    console.error('subscribe: mailerlite unreachable -', error);
     return reply(req, res, 502, 'Could not reach the mailing list.', {
       heading: 'Something went wrong', extra: FALLBACK_LINK,
     });
@@ -215,19 +277,26 @@ module.exports = async (req, res) => {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    // beehiiv's body carries the reason (bad key, wrong publication, blocked
-    // address). Logging it is the difference between a five-minute fix and a
-    // guessing game.
-    console.error('subscribe: beehiiv returned', response.status,
+    // The body carries the reason (bad token, unknown group, blocked address).
+    // Logging it is the difference between a five-minute fix and a guessing
+    // game.
+    console.error('subscribe: mailerlite returned', response.status,
                   JSON.stringify(payload));
     return reply(req, res, 502, 'Could not record that signup.', {
       heading: 'Something went wrong', extra: FALLBACK_LINK,
     });
   }
 
-  // `validating` and `pending` are both successes from the visitor's side —
-  // beehiiv has the address and is confirming it. Only the copy differs.
+  // The subscriber is on the sending list from here on, so nothing below may
+  // turn this into a failure the visitor sees.
+  //
+  // MailerLite answers `active` when the group takes the address outright, and
+  // `unconfirmed` when double opt-in is on and it has sent a confirmation. Both
+  // are successes from the visitor's side; only the copy differs, because only
+  // one of them still needs something from them.
   const status = payload?.data?.status || 'unknown';
+  await mirrorToBeehiiv(email, req.headers.referer);
+
   await notify(email, status, req.headers.referer);
 
   const message = status === 'active'

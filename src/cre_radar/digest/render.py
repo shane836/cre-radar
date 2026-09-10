@@ -155,23 +155,24 @@ def _pill_html(category: str | None) -> str:
     )
 
 
-def html_email(rows: list[sqlite3.Row], *, day: date) -> str:
-    """Single-column, table-based, inline-styled. No external assets."""
-    font = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
-    parts = [
-        f'<div style="{font};background:#f6f7f9;padding:24px 12px;margin:0">',
-        '<div style="max-width:600px;margin:0 auto">',
-        ('<div style="font-size:23px;font-weight:700;color:#1b1b20;margin:0 0 4px">'
-         f"&#128197;&nbsp; {_esc(HEADING)}</div>"),
-        ('<div style="font-size:13px;color:#7a7a85;margin:0 0 18px">'
-         f'{day.strftime("%A, %-d %B %Y")} &middot; {len(rows)} events</div>'),
-    ]
+FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+
+
+def _cards(rows: list[sqlite3.Row], *, empty: str) -> str:
+    """The week-grouped event cards, shared by the digest and the newsletter.
+
+    Both channels show the same events in the same shape; only the wrapper
+    around them differs. Keeping one builder means a fix to the card markup —
+    the part mail clients are fussy about — cannot land in one and miss the
+    other.
+    """
+    parts: list[str] = []
 
     if not rows:
         parts.append(
             '<div style="background:#fff;border:1px solid #e6e6eb;border-radius:12px;'
             'padding:24px;text-align:center;color:#8a8a94;font-size:14px">'
-            "Nothing new cleared the relevance floor.</div>"
+            f"{_esc(empty)}</div>"
         )
 
     for label, group in group_by_week(rows):
@@ -201,10 +202,121 @@ def html_email(rows: list[sqlite3.Row], *, day: date) -> str:
             )
         parts.append("</div>")
 
-    parts.append(
-        '<div style="font-size:11px;color:#a0a0aa;text-align:center;padding:6px 0 0">'
-        "cre-radar &middot; scored against scoring.toml</div></div></div>"
+    return "".join(parts)
+
+
+def html_email(rows: list[sqlite3.Row], *, day: date) -> str:
+    """Single-column, table-based, inline-styled. No external assets."""
+    return "".join([
+        f'<div style="{FONT};background:#f6f7f9;padding:24px 12px;margin:0">',
+        '<div style="max-width:600px;margin:0 auto">',
+        ('<div style="font-size:23px;font-weight:700;color:#1b1b20;margin:0 0 4px">'
+         f"&#128197;&nbsp; {_esc(HEADING)}</div>"),
+        ('<div style="font-size:13px;color:#7a7a85;margin:0 0 18px">'
+         f'{day.strftime("%A, %-d %B %Y")} &middot; {len(rows)} events</div>'),
+        _cards(rows, empty="Nothing new cleared the relevance floor."),
+        ('<div style="font-size:11px;color:#a0a0aa;text-align:center;padding:6px 0 0">'
+         "cre-radar &middot; scored against scoring.toml</div></div></div>"),
+    ])
+
+
+# --- HTML (public newsletter) -----------------------------------------------
+
+# MailerLite's merge tag for the per-recipient opt-out link. It has to reach
+# MailerLite verbatim: it is ASCII with no HTML-special characters, so `_esc`
+# would pass it through unharmed, but it is never escaped anyway because it is
+# built into the href rather than interpolated from data. A campaign whose HTML
+# is missing this is rejected at send time, which is the correct failure — an
+# unsubscribe link is not optional in bulk mail.
+UNSUBSCRIBE_TOKEN = "{$unsubscribe}"
+
+
+def html_newsletter(
+    rows: list[sqlite3.Row],
+    *,
+    day: date,
+    horizon_days: int,
+    site_url: str = "",
+    firm: str = "",
+    firm_url: str = "",
+    postal_address: str = "",
+) -> str:
+    """The public issue. Same cards as the digest; a different frame around them.
+
+    Three things separate this from :func:`html_email`, and all three are
+    consequences of it going to strangers rather than to Shane:
+
+    * it says what it is and who sends it, because the reader did not build it;
+    * it carries an unsubscribe link and a postal address, which bulk mail is
+      required to have and a one-recipient digest is not;
+    * it states its own window, so "nothing this fortnight" reads as a fact
+      rather than as a broken email.
+    """
+    heading = f"{_esc(HEADING)}"
+    empty = f"No events cleared the bar in the next {horizon_days} days."
+
+    footer: list[str] = [
+        ('<div style="font-size:11px;color:#8a8a94;text-align:center;'
+         'padding:14px 8px 0;line-height:1.6">')
+    ]
+    if site_url:
+        footer.append(
+            f'<a href="{_esc(site_url)}" style="color:#7a7a85">'
+            "See the full listing</a><br>"
+        )
+    if firm:
+        sender = (
+            f'<a href="{_esc(firm_url)}" style="color:#7a7a85">{_esc(firm)}</a>'
+            if firm_url else _esc(firm)
+        )
+        footer.append(f"Sent by {sender}.<br>")
+    if postal_address:
+        footer.append(f"{_esc(postal_address)}<br>")
+    footer.append(
+        f'<a href="{UNSUBSCRIBE_TOKEN}" style="color:#8a8a94;'
+        'text-decoration:underline">Unsubscribe</a></div>'
     )
+
+    return "".join([
+        f'<div style="{FONT};background:#f6f7f9;padding:24px 12px;margin:0">',
+        '<div style="max-width:600px;margin:0 auto">',
+        ('<div style="font-size:23px;font-weight:700;color:#1b1b20;margin:0 0 4px">'
+         f"&#128197;&nbsp; {heading}</div>"),
+        ('<div style="font-size:13px;color:#7a7a85;margin:0 0 18px">'
+         f'{day.strftime("%A, %-d %B %Y")} &middot; the next {horizon_days} days '
+         f"&middot; {len(rows)} events</div>"),
+        _cards(rows, empty=empty),
+        "".join(footer),
+        "</div></div>",
+    ])
+
+
+def html_signup_report(signups: list[str], *, day: date, total: int | None = None) -> str:
+    """The block appended to Shane's copy: who joined since the last issue.
+
+    Separate from the issue itself so the subscriber version can never
+    accidentally carry it — the two are concatenated by the caller, and only
+    for the copy addressed to Shane.
+    """
+    parts = [
+        ('<div style="max-width:600px;margin:18px auto 0;'
+         f'{FONT};background:#fff;border:1px solid #e6e6eb;border-radius:12px;'
+         'overflow:hidden">'),
+        ('<div style="background:#f2f3f6;padding:8px 16px;font-size:11px;'
+         'font-weight:700;letter-spacing:.07em;color:#6b6b76">'
+         f"NEW SUBSCRIBERS &middot; {len(signups)}</div>"),
+        '<div style="padding:13px 16px;font-size:13px;color:#1b1b20;line-height:1.7">',
+    ]
+    if signups:
+        parts.append("<br>".join(_esc(address) for address in signups))
+    else:
+        parts.append('<span style="color:#8a8a94">Nobody new this week.</span>')
+    if total is not None:
+        parts.append(
+            '<div style="margin-top:8px;font-size:12px;color:#7a7a85">'
+            f"{total} active on the list.</div>"
+        )
+    parts.append("</div></div>")
     return "".join(parts)
 
 

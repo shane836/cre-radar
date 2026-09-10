@@ -92,14 +92,23 @@ Publish a forwarding alias here, not the primary work address.
 The mailing-list block is a field and a **Subscribe** button, and says the
 newsletter is **weekly** — the cadence is the first thing anyone weighing a
 signup wants to know, and the button cannot say it alone. It posts to
-`api/subscribe.js` on this same site, which creates the subscription on
-cre-radar's **own beehiiv publication** through beehiiv's v2 API, tagged
-`utm_medium=cre-radar`. Nothing is stored in this repo — beehiiv is the list.
+`api/subscribe.js` on this same site, which puts the address in cre-radar's
+**MailerLite group**, tagged `medium=cre-radar`. Nothing is stored in this repo
+— MailerLite is the list. `cre-radar newsletter` is what actually sends to it,
+Thursdays, covering the next 14 days.
 
-Its own publication, rather than the firm's `Website - Spec Contact & Insights`
-audience: this digest has a different cadence and its own reason to
-unsubscribe, and mixing the two would cost the firm's list a subscriber every
-time someone tires of the events.
+Its own **group**, rather than the firm's associates list, and for the same
+reason it once had its own beehiiv publication: this digest has a different
+cadence and its own reason to unsubscribe, and mixing the two would cost the
+firm's list a subscriber every time someone tires of the events. One MailerLite
+account, one authenticated sending domain, two groups that never see each
+other's mail.
+
+beehiiv is where this list used to live and is now only a mirror, kept while the
+existing subscribers are moved across. It cannot send: the cre-radar publication
+is on the free plan and beehiiv's Create Post endpoint needs Max or Enterprise,
+which is exactly why the signup box spent weeks promising a weekly issue that
+nothing was going to deliver.
 
 Posting same-origin keeps the page's zero-external-requests property. Without
 JavaScript the form is a plain POST and the function answers with a page.
@@ -111,10 +120,11 @@ Set these on the **Vercel project**, not in `.env` (which is never deployed):
 
 | Variable | |
 |---|---|
-| `BEEHIIV_API_KEY` | required. beehiiv → Settings → API. |
-| `BEEHIIV_PUBLICATION_ID` | required. The cre-radar publication, `pub_…`. |
-| `BEEHIIV_SUBSCRIBE_URL` | optional. The publication's hosted signup page, where a failed signup is sent. Also set `SUBSCRIBE_URL` in `site.py` so the script offers the same link. |
-| `RESEND_API_KEY`, `SUBSCRIBE_TO` | optional. Emails a copy of each signup to the radar alias. Best-effort: a mail failure never fails a signup beehiiv already accepted. |
+| `MAILERLITE_API_KEY` | required. MailerLite → Integrations → API. |
+| `MAILERLITE_GROUP_ID` | required. The **cre-radar** group — not the associates one, which shares the account. |
+| `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID` | optional, transitional. Mirrors each signup to the old beehiiv list. Delete both once the migration is done; the mirror retires itself. |
+| `BEEHIIV_SUBSCRIBE_URL` | optional. A hosted signup page, where a failed signup is sent. Also set `SUBSCRIBE_URL` in `site.py` so the script offers the same link. |
+| `RESEND_API_KEY`, `SUBSCRIBE_TO` | optional. Emails a copy of each signup to the radar alias. Best-effort: a mail failure never fails a signup MailerLite already accepted. |
 
 Missing either required variable logs the names and returns a 500 rather than
 showing a thank-you for a signup nobody received.
@@ -150,6 +160,9 @@ uv run cre-radar score              # score anything unjudged
 uv run cre-radar rescore            # re-score everything after editing scoring.toml
 uv run cre-radar digest --dry-run   # see the digest without sending or marking
 
+uv run cre-radar newsletter --dry-run --force   # the public weekly issue
+uv run cre-radar newsletter --force             # ...and actually send it
+
 uv run cre-radar publish            # regenerate public/index.html
 uv run cre-radar publish --deploy   # ...and push it to Vercel
 uv run cre-radar doctor             # is everything configured?
@@ -180,6 +193,21 @@ If the first scheduled run produces nothing, grant Full Disk Access to
 `/bin/bash` — the repo is inside Dropbox, a protected location for background
 jobs, and the failure is otherwise silent.
 
+### Weekly
+
+There is no second scheduler, deliberately. `run` calls `newsletter` every day
+and a weekday gate inside it returns immediately except on `NEWSLETTER_DAY`
+(Thursday). A second launchd agent would fire at the same 07:00 and race the
+daily one for the lock on a single SQLite file, which is the one thing
+`daily.sh` exists to prevent.
+
+The issue covers the next `NEWSLETTER_HORIZON_DAYS` (14) rather than everything
+on the site, ignores `surfaced_at` — that column tracks Shane's digest, and a
+subscriber has seen none of it — and is not sent at all when the window is
+empty, because an empty issue trains people to ignore the sender. Shane gets a
+copy of whatever went out with the week's new signups appended, so a quiet week
+still reports itself.
+
 ## The site
 
 `publish` renders `public/index.html` — one self-contained file, no build step, no
@@ -206,19 +234,47 @@ uv run cre-radar publish --deploy
 
 Things known to be missing, kept here rather than in someone's head.
 
-- **Set the beehiiv newsletter to send weekly.** The signup box now promises a
-  weekly digest, and nothing yet fulfils it: beehiiv holds the subscribers but
-  has no scheduled send. Set the publication's send schedule to weekly (or wire
-  the digest to beehiiv's Send API, which needs the Max plan). Until that is
-  done the page is making a promise the system does not keep — this is the one
-  item on this list with a deadline attached to it.
-- **Link masonequitypartners.com from the digest footer.** The email footer is
-  `cre-radar · scored against scoring.toml` and the page footer adds `no AI,
-  just rules` — neither points anywhere. Once the digest goes to subscribers
-  rather than to one inbox, that footer is the only place it says who is
-  sending it. One line in `html_email` in `digest/render.py`, using
-  `site.FIRM_URL` rather than a fresh literal. The vault note has no footer and
-  needs none — nobody but Shane reads it.
+- **Stand up MailerLite and switch the list over.** This is the one item with a
+  deadline: the signup box promises a **weekly** digest and nothing has ever
+  sent one. The code side is done — `cre-radar newsletter` renders the issue,
+  sends it Thursdays through MailerLite, and mails Shane a copy with the week's
+  new signups. None of it has run against a real account, because there is not
+  one yet.
+
+  The account is already on the vault's critical path for the associates blast
+  (`Active/Email - Pre-Blast Deliverability.md`); this rides on the same account
+  and the same warmed sending domain rather than starting a second one. Order:
+
+  1. Create the account and the $11 plan.
+  2. Authenticate `news.masonequitypartners.com` — SPF and DKIM on the
+     **subdomain**. Never edit the root record; it is M365's `v=spf1
+     include:spf.protection.outlook.com -all` and the firm's real mail depends
+     on it.
+  3. Create the cre-radar group. It must not be the associates group.
+  4. Move the two existing beehiiv subscribers across.
+  5. Fill `MAILERLITE_API_KEY`, `MAILERLITE_GROUP_ID`, `NEWSLETTER_FROM` and
+     `NEWSLETTER_POSTAL_ADDRESS` in `.env`, and the first two on the **Vercel**
+     project as well — the function needs them and `.env` is not deployed.
+  6. Send once with `--force` to a group containing only Shane's address, and
+     read it in a real client, before any subscriber is in it.
+
+  `cre-radar doctor` reports which of these is still missing and warns rather
+  than blocks, so the daily run keeps working throughout.
+
+- **Then delete the beehiiv mirror.** Once the subscribers are moved, remove
+  `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` from the Vercel project. The
+  mirror in `api/subscribe.js` retires itself when they go — no code change.
+
+- **Fill `NEWSLETTER_POSTAL_ADDRESS`.** Bulk mail is required to carry a physical
+  address. It is empty, so the footer omits the line entirely rather than
+  shipping a placeholder that looks filled in.
+
+- **No SPF on `updates.`, and no DMARC anywhere.** Separate from the above and
+  worth knowing: `updates.masonequitypartners.com` (Shane's daily digest, via
+  Resend) has Resend's DKIM published but no SPF record, and neither the root
+  nor either subdomain has a `_dmarc` record. A root `_dmarc` at `p=none` would
+  cover `news.` and `updates.` both. This is the vault's call, not this repo's —
+  it touches the firm's M365 mail.
 - **Fold the page into masonequitypartners.com as a tab, if it earns the
   traffic.** It lives at `radar.masonequitypartners.com` — its own Vercel
   project, independently deployable, which is what the nightly launchd job
@@ -244,11 +300,14 @@ Things known to be missing, kept here rather than in someone's head.
   with no city slips past the geography rules entirely.
 
 - **Weekly: check the newsletter stats.** Opens, clicks and unsubscribes in
-  beehiiv, read against what actually went out. Nothing in this repo does it or
+  MailerLite, read against what actually went out — and against the bounce and
+  complaint thresholds the vault's deliverability note sets, since this shares a
+  sending domain with the firm's own list. Nothing in this repo does it or
   should — it is a standing item for the vault, listed here because the digest
   is the thing being measured.
 - Shane's own digest stays daily and is unrelated: it goes through Resend to a
-  named address, not through beehiiv.
+  named address, not through MailerLite. He also gets a copy of each weekly
+  issue with the new signups appended.
 
 ## Tuning
 

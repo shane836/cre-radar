@@ -5,7 +5,7 @@ from datetime import date
 
 import typer
 
-from . import db, events, score
+from . import HEADING, db, events, score
 from .config import min_score
 from .digest import email as email_digest
 from .digest import obsidian, render
@@ -113,6 +113,92 @@ def digest_cmd(
             typer.secho("email skipped (Resend not configured)", fg=typer.colors.YELLOW)
 
     db.mark_surfaced(conn, "events", [row["id"] for row in pending])
+
+
+@app.command("newsletter")
+def newsletter_cmd(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the HTML; send nothing."),
+    force: bool = typer.Option(False, "--force", help="Send even if today is not the send day."),
+    no_report: bool = typer.Option(False, "--no-report", help="Skip Shane's copy."),
+) -> None:
+    """Send the public weekly issue to the MailerLite list.
+
+    Runs inside the daily job rather than on a scheduler of its own: there is
+    exactly one scheduler by design, and a second launchd agent firing at the
+    same 07:00 would race the daily run for the lock on one SQLite file. The
+    day gate below is what makes a daily invocation weekly.
+    """
+    from datetime import date as date_cls
+
+    from . import site
+    from .config import (
+        newsletter_day,
+        newsletter_horizon_days,
+        newsletter_postal_address,
+    )
+    from .digest import newsletter
+
+    day = date_cls.today()
+    if not force and day.weekday() != newsletter_day():
+        typer.secho("not the send day — nothing to do.", fg=typer.colors.BLUE)
+        return
+
+    horizon = newsletter_horizon_days()
+    rows = db.newsletter_events(db.connect(), min_score(), horizon)
+    issue = render.html_newsletter(
+        rows,
+        day=day,
+        horizon_days=horizon,
+        site_url=site.SITE_URL,
+        firm=site.FIRM,
+        firm_url=site.FIRM_URL,
+        postal_address=newsletter_postal_address(),
+    )
+    subject = f"{HEADING} — {day.strftime('%-d %b')}"
+
+    if dry_run:
+        typer.echo(issue)
+        typer.secho(
+            f"\n[dry run] {len(rows)} events in the next {horizon} days. Nothing sent.",
+            fg=typer.colors.YELLOW,
+        )
+        return
+
+    # An empty issue is worse than no issue: it trains subscribers to ignore
+    # the sender and costs deliverability on a domain that is still warming.
+    # Shane still hears about it below — a quiet week must not look like a
+    # broken pipeline.
+    people: list[dict] = []
+    if not newsletter.configured():
+        typer.secho("newsletter skipped (MailerLite not configured)", fg=typer.colors.YELLOW)
+    elif not rows:
+        typer.secho(
+            f"no events in the next {horizon} days — nothing sent to the list.",
+            fg=typer.colors.YELLOW,
+        )
+    else:
+        people = newsletter.subscribers()
+        campaign = newsletter.send_campaign(
+            issue, subject=subject, name=f"cre-radar {day.isoformat()}"
+        )
+        _echo_ok(f"campaign sent to {len(people)} subscribers: {campaign}")
+
+    if no_report:
+        return
+
+    # Shane's copy: the issue exactly as it went out, plus who joined. One
+    # email, so the thing he is asked to check and the list it went to are
+    # never a tab apart.
+    if newsletter.configured() and not people:
+        people = newsletter.subscribers()
+    report = render.html_signup_report(
+        newsletter.new_since(people, 7), day=day, total=len(people)
+    )
+    message_id = email_digest.send(issue + report, day=day, subject=f"[copy] {subject}")
+    if message_id:
+        _echo_ok(f"your copy sent: {message_id}")
+    else:
+        typer.secho("your copy skipped (Resend not configured)", fg=typer.colors.YELLOW)
 
 
 def _page_is_live(body: str) -> bool:
@@ -247,6 +333,10 @@ def run_all(
     if publish:
         publish_cmd(deploy=True, prod=True)
     digest_cmd(dry_run=False, no_email=no_email, no_obsidian=False)
+    # Last, and after the digest on purpose: a MailerLite outage must not cost
+    # Shane the vault note and the daily email. The day gate inside makes a
+    # daily call weekly.
+    newsletter_cmd(dry_run=False, force=False, no_report=no_email)
 
 
 @sources_app.command("list")

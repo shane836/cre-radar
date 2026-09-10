@@ -10,8 +10,13 @@ from datetime import date
 from ..config import digest_from, digest_to, resend_api_key
 
 
-def send(html_body: str, *, day: date) -> str | None:
-    """Send the digest. Returns the Resend message id, or None if skipped."""
+def send(html_body: str, *, day: date, subject: str | None = None) -> str | None:
+    """Send to Shane's own address. Returns the Resend message id, or None if
+    skipped.
+
+    ``subject`` overrides the daily default so the weekly newsletter copy is
+    filed separately in his inbox rather than looking like another daily digest.
+    """
     key, sender, recipients = resend_api_key(), digest_from(), digest_to()
     if not (key and sender and recipients):
         return None
@@ -22,7 +27,7 @@ def send(html_body: str, *, day: date) -> str | None:
     response = resend.Emails.send({
         "from": sender,
         "to": recipients,
-        "subject": f"CRE Radar — {day.strftime('%d %b')}",
+        "subject": subject or f"CRE Radar — {day.strftime('%d %b')}",
         "html": html_body,
     })
     return response.get("id") if isinstance(response, dict) else None

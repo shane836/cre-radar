@@ -155,6 +155,31 @@ def upcoming_events(conn: sqlite3.Connection, floor: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def newsletter_events(conn: sqlite3.Connection, floor: int, days: int) -> list[sqlite3.Row]:
+    """Future events at or above the floor starting within ``days``.
+
+    The third question this table gets asked, and the only one with a horizon.
+    :func:`pending_events` asks "what has Shane not been told yet" and
+    :func:`upcoming_events` asks "what is coming up" — neither fits a
+    subscriber, who has been told nothing at all and would otherwise receive
+    every event on the site in one email.
+
+    ``surfaced_at`` is deliberately ignored: it records what went to *Shane's*
+    digest, and a subscriber has never seen any of it.
+    """
+    return conn.execute(
+        """
+        SELECT * FROM events
+        WHERE score >= ?
+          AND starts_at IS NOT NULL
+          AND starts_at >= datetime('now', '-12 hours')
+          AND starts_at < datetime('now', ?)
+        ORDER BY starts_at
+        """,
+        (floor, f"+{int(days)} days"),
+    ).fetchall()
+
+
 def mark_surfaced(conn: sqlite3.Connection, table: str, ids: list[int]) -> None:
     """Stamp rows as delivered so tomorrow's digest does not repeat them."""
     if not ids:

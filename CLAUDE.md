@@ -24,6 +24,7 @@ uv run ruff check .                 # lint
 uv run cre-radar doctor             # config pre-flight
 uv run cre-radar run                # the whole pipeline
 uv run cre-radar digest --dry-run   # safe: renders without delivering
+uv run cre-radar newsletter --dry-run --force   # the public weekly issue
 ./scripts/rebuild.sh                # after changing EXTRACTION rules
 ./scripts/install-launchd.sh        # install the daily 07:00 agent
 ```
@@ -99,36 +100,43 @@ accent-filled control uses `var(--on-accent)` for its text, never `#fff`.
 
 ## The mailing list
 
-**cre-radar has its own beehiiv publication.** That reverses the earlier rule —
-`Website - Spec Contact & Insights` in the vault said never run a second list,
-and for a while cre-radar signups were tagged against the firm's audience.
-Shane's call, Aug 2026: this digest has its own cadence and its own reason to
-unsubscribe, and one list would cost the firm a subscriber every time someone
-tires of the events. Signups still carry `utm_medium=cre-radar`, so the two
-stay separable inside beehiiv.
+**MailerLite is the list, and it is what sends.** That reverses the August 2026
+decision to run cre-radar on its own beehiiv publication, for one reason:
+beehiiv on the free plan cannot send programmatically at all — its Create Post
+endpoint is Max/Enterprise — so the signup box promised a weekly digest for
+weeks while nothing on earth was going to deliver one.
 
-**Still no subscribers table here.** beehiiv is the list; this repo stores
+Shane's call, Sept 2026: run it on the same MailerLite account and the same
+authenticated sending domain (`news.masonequitypartners.com`) the firm is
+already warming for the associates blast. One domain, one reputation, one
+warm-up to manage rather than two.
+
+**The two audiences are two groups, never one.** `MAILERLITE_GROUP_ID` is not
+optional anywhere it appears. A campaign scoped to the account rather than to
+the group would mail the events newsletter to the firm's associates list.
+
+**Still no subscribers table here.** MailerLite is the list; this repo stores
 nothing. Do not add one.
+
+**beehiiv is a mirror, and only until the migration finishes.** `api/subscribe.js`
+still writes to it when `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` are set,
+best-effort and logged — MailerLite already has the subscriber by then, so a
+beehiiv failure is a stale mirror, not a lost signup. Deleting those two
+variables from the Vercel project retires the leg with no code change. That is
+the intended end state, not a misconfiguration.
 
 The block is a field and a Subscribe button posting to `api/subscribe.js` on
 this same origin, which is why the page still makes **zero external requests**.
 Setting `BEEHIIV_EMBED_URL` trades that for beehiiv's iframe — a deliberate
 escape hatch, not an oversight, and the only one.
 
-`api/subscribe.js` creates the subscription through beehiiv's **v2 API**. Do
-not try to post to the hosted page instead: `/create` needs a per-session
-`visit_token` a static page cannot mint, and `/subscribe?email=` does not
-prefill, so a hand-rolled field posting there makes the visitor type the
-address twice. Both verified against the live page, Aug 2026. The hosted page
-stays in the code as the *failure* route only.
-
 Four things in that function are load-bearing:
 
-- **A missing env var is a 500, never a thank-you.** `BEEHIIV_API_KEY` and
-  `BEEHIIV_PUBLICATION_ID` live in the **Vercel** project env, not the local
+- **A missing env var is a 500, never a thank-you.** `MAILERLITE_API_KEY` and
+  `MAILERLITE_GROUP_ID` live in the **Vercel** project env, not the local
   `.env`, which is not deployed. Swallowing the miss would drop real signups
   behind a message the visitor believes.
-- **The Resend receipt is best-effort and must stay that way.** beehiiv already
+- **The Resend receipt is best-effort and must stay that way.** The list already
   has the subscriber by the time it runs; a mail failure is logged, never
   surfaced. Turning it into an error would report a successful signup as a
   failure.
@@ -139,17 +147,48 @@ Four things in that function are load-bearing:
   `display:none` — a bot that skips hidden inputs walks past the trap. A filled
   one gets a cheerful 200 and no subscription.
 
-**The box says "weekly" and nothing sends weekly yet.** beehiiv holds the
-subscribers but has no scheduled send; setting the publication's schedule is
-open work, tracked under *Future scope* in the README. Do not "fix" the copy by
-dropping the cadence — the promise is the point, and the send is what is
-missing. Shane's own daily digest goes through Resend to a named address and is
-a different thing entirely.
-
 **Never let the fallback point at the firm's publication.** `SUBSCRIBE_URL` in
 `site.py` and `BEEHIIV_SUBSCRIBE_URL` in the function both default to empty and
 omit the link, because a wrong link here puts an events reader on the firm's
 investor list. Fill them with cre-radar's own hosted page or leave them blank.
+
+## The weekly issue
+
+`cre-radar newsletter` sends it; `digest/newsletter.py` is the transport and
+`render.html_newsletter` the body. **Thursdays**, a 14-day window, both settable
+via `NEWSLETTER_DAY` and `NEWSLETTER_HORIZON_DAYS` and both pinned by tests —
+the box promises weekly, so the cadence is the promise.
+
+**None of the MailerLite calls have ever run.** The account does not exist yet;
+the requests are written from the v2 docs. Standing up the account is tracked
+under *Future scope* in the README, and until it is done `doctor` warns and the
+newsletter step no-ops. Treat the request shapes here as unverified: the first
+live send should go to a group containing only Shane's address.
+
+- **It runs inside the daily job, not on a scheduler of its own.** There is
+  exactly one scheduler by design (see *The daily run*), and a second launchd
+  agent firing at 07:00 would race the daily one for the lock on a single
+  SQLite file. `run` calls `newsletter` every day and the weekday gate inside
+  is what makes it weekly. Do not "fix" this by adding a second plist.
+- **It runs last, after the digest.** A MailerLite outage must not cost Shane
+  the vault note and the daily email.
+- **An empty issue is never sent.** A fortnight with no events would train
+  subscribers to ignore the sender and spend reputation on a domain that is
+  still warming. Shane's copy still goes out saying so, because a quiet week
+  must not look like a broken pipeline.
+- **`render.UNSUBSCRIBE_TOKEN` must reach MailerLite verbatim.** `{$unsubscribe}`
+  is ASCII with no HTML-special characters, so `_esc` passes it through — but
+  that is a property, not an accident, and `tests/test_newsletter.py` pins it.
+  `send_campaign` refuses a body without it rather than letting MailerLite
+  reject the campaign after creating it and leaving a draft behind.
+- **`newsletter_events` ignores `surfaced_at`.** That column records what went
+  to *Shane's* digest; a subscriber has seen none of it. Using `pending_events`
+  here would silently send subscribers only the events Shane had not yet read.
+- **Shane's daily digest carries no opt-out and must not.** It goes to one known
+  address through Resend. A merge token in it renders as literal braces.
+- **The postal address is empty by default and omits the line.** Bulk mail is
+  required to carry one; a placeholder in a compliance footer is worse than no
+  line, because it looks filled in. `doctor` warns while it is unset.
 
 ## Publishing
 

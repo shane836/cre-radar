@@ -61,6 +61,39 @@ def _resend() -> Check:
     return Check("Email (Resend)", True, f"{sender} -> {', '.join(to)}")
 
 
+def _newsletter() -> Check:
+    """The public weekly issue, through MailerLite.
+
+    Never required: the daily run must survive an unconfigured newsletter, and
+    for most of this project's life there was no list to send to at all.
+    """
+    import calendar
+
+    key = config.mailerlite_api_key()
+    group = config.mailerlite_group_id()
+    sender = config.newsletter_from()
+    day = calendar.day_name[config.newsletter_day()]
+
+    if not key:
+        return Check("Newsletter", False, "MAILERLITE_API_KEY not set",
+                     "The weekly issue will not send. Set it in .env.", required=False)
+    if not group:
+        return Check("Newsletter", False, "MAILERLITE_GROUP_ID not set",
+                     "Without a group the campaign would go to the whole "
+                     "account, associates list included.", required=False)
+    if not sender:
+        return Check("Newsletter", False, "NEWSLETTER_FROM not set",
+                     "Must be an address on a domain MailerLite has "
+                     "authenticated.", required=False)
+    if not config.newsletter_postal_address():
+        return Check("Newsletter", False, "NEWSLETTER_POSTAL_ADDRESS not set",
+                     "Bulk mail is required to carry a physical address; the "
+                     "footer currently omits the line.", required=False)
+    return Check("Newsletter", True,
+                 f"{sender} -> group {group}, {day}s, "
+                 f"{config.newsletter_horizon_days()}-day window")
+
+
 def _scoring() -> Check:
     """scoring.toml IS the scorer — without it nothing can be judged."""
     path = config.scoring_path()
@@ -108,5 +141,5 @@ def run() -> list[Check]:
     """Every check, cheapest first so failures surface fast."""
     return [
         _sources(), _scoring(), _database(),
-        _obsidian(), _resend(), _chromium(),
+        _obsidian(), _resend(), _newsletter(), _chromium(),
     ]

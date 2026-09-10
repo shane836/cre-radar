@@ -50,6 +50,7 @@ half-judged database.
 | Score | `cre-radar score` / `rescore` | relevance judgment | `scoring.toml` | `events.score/reason/topics` |
 | Publish | `cre-radar publish` | the public page | `events` | `public/index.html` |
 | Deliver | `cre-radar digest` | email + vault note | `events` | Resend, the vault, `events.surfaced_at` |
+| Broadcast | `cre-radar newsletter` | the public weekly issue | `events` | MailerLite |
 | Everything | `cre-radar run` | the cron entry point | — | — |
 
 ## Directories
@@ -59,7 +60,7 @@ half-judged database.
 | `src/cre_radar/` | the whole application. See the module map below. |
 | `src/cre_radar/adapters/` | one class per *kind of stream* (page, feed), not per site. Each implements the `SourceAdapter` protocol; none imports another. |
 | `src/cre_radar/sources/` | the registry loader — turns `sources.toml` rows into `Source` objects. Sources are data; this is the only code that reads them. |
-| `src/cre_radar/digest/` | the outbound channels: layout (`render.py`), email transport (`email.py`), vault file (`obsidian.py`). Layout is separate from transport so `--dry-run` renders without sending. |
+| `src/cre_radar/digest/` | the outbound channels: layout (`render.py`), email transport (`email.py`), public-list transport (`newsletter.py`), vault file (`obsidian.py`). Layout is separate from transport so `--dry-run` renders without sending. |
 | `tests/` | 118 tests. `conftest.py` builds contract objects so tests never hand-roll a `NormalizedEvent`. |
 | `fixtures/` | real captured pages (AAGLA, BREAA, NAIOP SoCal). The extractor tests run offline against these — extraction regressions are caught without a network. |
 | `rubrics/` | `milestone-contract.md`, the PGE rubric the tests implement. Add a dimension there *before* adding a test. |
@@ -126,8 +127,9 @@ Ordered the way data moves.
 | Module | Responsibility |
 |---|---|
 | `site.py` | the whole public page, in one module, written to `public/index.html`. No framework, no build step, no external request. |
-| `digest/render.py` | the email HTML and the Markdown note. Email HTML is tables and inline styles — mail clients drop `<style>` blocks — and ASCII-only, because an email body has no `<head>` to declare a charset. |
-| `digest/email.py` | Resend. Unconfigured is not an error: the send is skipped and reported, the note still lands, the run still exits clean. |
+| `digest/render.py` | the email HTML, the public newsletter HTML and the Markdown note. Both HTML bodies share `_cards`, so a fix to the markup mail clients are fussy about cannot land in one and miss the other. Tables and inline styles, ASCII-only — an email body has no `<head>` to declare a charset. |
+| `digest/email.py` | Resend, to Shane's own address. Unconfigured is not an error: the send is skipped and reported, the note still lands, the run still exits clean. |
+| `digest/newsletter.py` | MailerLite, to the public list. Same unconfigured-is-a-skip contract; a configured transport that *fails*, though, raises. Scoped to a group, never the account — the firm's associates list is in there. |
 | `digest/obsidian.py` | writes the dated vault note. Never overwrites — a second run the same day gets a numbered suffix. |
 
 ## Identity: three layers
@@ -204,6 +206,7 @@ Adding a source or retuning relevance must never require a code change.
 | How a page is parsed | `heuristic.py` | `./scripts/rebuild.sh` |
 | The public page | `site.py` | `cre-radar publish` |
 | The email or the note | `digest/render.py` | `cre-radar digest --dry-run` |
+| The public weekly issue | `digest/render.py` | `cre-radar newsletter --dry-run --force` |
 
 **Two kinds of tuning, two different fixes.** Scoring re-judges rows already
 stored, so `rescore` suffices. Extraction rules only affect *new* extractions —
