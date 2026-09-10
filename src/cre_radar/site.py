@@ -50,6 +50,27 @@ BUILDER_ROLE = "principal"
 FIRM = "Mason Equity Partners"
 FIRM_URL = "https://masonequitypartners.com"
 
+# --- Link previews -----------------------------------------------------------
+# What LinkedIn, X and Slack show when the URL is pasted. The page shipped
+# without any of this until 10 Sep 2026, so the launch post rendered no card at
+# all and LinkedIn cached that emptiness on first scrape.
+#
+# `og:image` is the one asset that is NOT inlined the way the mark is: it must
+# be an absolute HTTPS URL a scraper can fetch, and a data URI there yields no
+# card. `publish` copies it out of `assets/` into `public/`. The page itself
+# still makes zero external requests — only the scraper ever fetches this.
+DESCRIPTION = (
+    "Upcoming Southern California commercial real estate and real estate "
+    "investment events, updated daily."
+)
+# Renamed from og-image.png on 10 Sep 2026 to bust LinkedIn's image cache
+# after a first version shot too small to survive their downscale. Re-shoot with
+# `scripts/shoot-card.py`; rename again if a bad one ever gets scraped.
+OG_IMAGE = "og-card.png"
+# LinkedIn's crop. A relative path silently yields no image and anything under
+# 200x200 is rejected outright, so both the URL and the size are stated.
+OG_WIDTH, OG_HEIGHT = 1200, 627
+
 # The *profile* URL. Not /feed/, which is whatever the viewer's own logged-in
 # home page happens to be rather than Shane's. Empty = the link is omitted.
 LINKEDIN_URL = "https://www.linkedin.com/in/masonshane/"
@@ -388,8 +409,20 @@ def render(rows: list[sqlite3.Row], *, generated: datetime) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{_esc(APP_NAME)}</title>
-<meta name="description" content="Upcoming Southern California commercial real
-estate and real estate investment events, updated daily.">
+<meta name="description" content="{_esc(DESCRIPTION)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{_esc(APP_NAME)}">
+<meta property="og:url" content="{SITE_URL}/">
+<meta property="og:title" content="{_esc(APP_NAME)}">
+<meta property="og:description" content="{_esc(DESCRIPTION)}">
+<meta property="og:image" content="{SITE_URL}/{OG_IMAGE}">
+<meta property="og:image:width" content="{OG_WIDTH}">
+<meta property="og:image:height" content="{OG_HEIGHT}">
+<meta property="og:image:alt" content="{_esc(HEADING)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{_esc(APP_NAME)}">
+<meta name="twitter:description" content="{_esc(DESCRIPTION)}">
+<meta name="twitter:image" content="{SITE_URL}/{OG_IMAGE}">
 <script>document.documentElement.className='js'</script>
 <script type="application/ld+json">{_jsonld()}</script>
 <style>

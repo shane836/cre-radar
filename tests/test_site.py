@@ -24,6 +24,42 @@ def page(monkeypatch):
     )
 
 
+# --- Link previews -----------------------------------------------------------
+
+def test_card_image_is_an_absolute_https_url(page):
+    """A relative `og:image` silently yields no image. This is the whole reason
+    the launch post rendered no card."""
+    assert f'content="{site.SITE_URL}/{site.OG_IMAGE}"' in page
+    assert 'property="og:image"' in page
+    assert "https://" in site.SITE_URL
+
+
+def test_card_image_is_not_a_data_uri(page):
+    """The mark is inlined; this one cannot be. A scraper fetches `og:image` by
+    URL and does not decode a data URI."""
+    assert 'property="og:image" content="data:' not in page
+
+
+def test_card_states_its_dimensions(page):
+    """Under 200x200 is rejected outright, and a scraper that has the size up
+    front does not have to fetch the file to lay the card out."""
+    assert f'content="{site.OG_WIDTH}"' in page
+    assert f'content="{site.OG_HEIGHT}"' in page
+
+
+def test_card_carries_a_summary_large_image(page):
+    """Without it X renders the small square card, which crops the listing to
+    an unreadable corner."""
+    assert 'name="twitter:card" content="summary_large_image"' in page
+
+
+def test_description_is_one_line(page):
+    """It was a wrapped source string, so the rendered attribute carried a
+    newline into every preview that used it."""
+    assert "\n" not in site.DESCRIPTION
+    assert f'name="description" content="{site.DESCRIPTION}"' in page
+
+
 # --- The firm's mark ---------------------------------------------------------
 
 def test_logo_links_to_the_firm_and_opens_safely(page):
@@ -303,7 +339,8 @@ def test_renaming_the_product_does_not_rename_the_command(monkeypatch):
     page = site.render([], generated=datetime(2026, 8, 26, 12, 0, tzinfo=UTC))
 
     assert "CRE Events Radar" not in page
-    assert page.count("Renamed Thing") == 3      # title, brand, json-ld
+    # title, og:site_name, og:title, twitter:title, brand, json-ld
+    assert page.count("Renamed Thing") == 6
     assert "cre-radar" in page                   # the footer credit stands
 
 

@@ -225,6 +225,7 @@ def publish_cmd(
 ) -> None:
     """Generate the public site into `public/`, optionally deploying it."""
     import re
+    import shutil
     import subprocess
     from datetime import datetime
     from zoneinfo import ZoneInfo
@@ -241,6 +242,20 @@ def publish_cmd(
     page = out / "index.html"
     page.write_text(site.render(rows, generated=generated))
     _echo_ok(f"{len(rows)} upcoming events -> {page}")
+
+    # The one asset that is not inlined into the page: `og:image` has to be a
+    # URL a scraper can fetch. Copied from `assets/` rather than generated
+    # here, so a stale card is a file someone can look at and re-shoot rather
+    # than a silent step inside the build.
+    card = REPO_ROOT / "assets" / site.OG_IMAGE
+    if card.exists():
+        shutil.copyfile(card, out / site.OG_IMAGE)
+        _echo_ok(f"link-preview card -> {out / site.OG_IMAGE}")
+    else:
+        typer.secho(
+            f"no assets/{site.OG_IMAGE} — link previews will render no image",
+            fg=typer.colors.YELLOW,
+        )
 
     if not deploy:
         typer.secho("not deployed (pass --deploy)", fg=typer.colors.YELLOW)

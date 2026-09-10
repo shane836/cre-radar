@@ -26,4 +26,9 @@ launchd.log
 # Local mockups. Never part of the deploy.
 *.jpg
 *.png
+# ...except the link-preview card, which is the one image that must be a real
+# fetchable file rather than a data URI. `publish` copies it into `public/`,
+# and without this negation the blanket `*.png` above silently drops it and
+# every preview renders with no image. Cost one deploy to find, 10 Sep 2026.
+!public/og-card.png
 navbar-*.html
