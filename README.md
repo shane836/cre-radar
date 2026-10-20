@@ -13,8 +13,7 @@ renaming the command.
 
 **Live:** https://radar.masonequitypartners.com
 
-**No API key. No model. No per-run cost.** Everything is deterministic scripts —
-the same inputs always produce the same digest.
+Collection, extraction, and scoring use deterministic scripts without a model or extraction API key. Optional email delivery and newsletter subscriptions require the provider credentials described below and may incur provider charges. Given the same inputs, the rules produce the same digest.
 
 ## How this was built
 
