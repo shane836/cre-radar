@@ -205,9 +205,10 @@ def record_run(
 
 
 def last_page_hash(conn: sqlite3.Connection, slug: str) -> str | None:
-    """Hash of the page the last *successful* extraction ran on, if any."""
+    """Last successful hash, expiring weekly to catch edits at existing URLs."""
     row = conn.execute(
-        "SELECT page_hash FROM source_state WHERE slug = ?", (slug,)
+        "SELECT page_hash FROM source_state WHERE slug = ? "
+        "AND extracted_at > datetime('now', '-7 days')", (slug,)
     ).fetchone()
     return row["page_hash"] if row else None
 

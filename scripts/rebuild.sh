@@ -16,7 +16,9 @@ if [[ -f "$DB" ]]; then
 fi
 
 rm -f "$DB"
-uv run cre-radar collect
+status=0
+uv run cre-radar collect || status=$?
 uv run cre-radar score
 echo
 echo "Rebuilt. Preview with: uv run cre-radar digest --dry-run"
+exit "$status"

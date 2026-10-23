@@ -319,6 +319,7 @@ def extract(
     for index, line in enumerate(lines):
         if match := _BARE_MONTH.match(line):
             month, day, age = _MONTH_NUM[match.group(1)[:3].lower()], None, 0
+            explicit_year = None
             continue
         if (match := _BARE_DAY.match(line)) and month:
             day, age = int(match.group(1)), 0
@@ -328,6 +329,7 @@ def extract(
             month = _MONTH_NUM[name]
             day = int(match.group(2) or match.group(3))
             age = 0
+            explicit_year = None
             if year := _YEAR.search(line):
                 explicit_year = int(year.group(1))
 
@@ -350,12 +352,19 @@ def extract(
 
         # A date on the link's own following lines belongs to this link. Only
         # fall back to the running context from above when there isn't one.
-        window = " ".join(lines[index + 1 : index + 4])
-        ahead = _INLINE_DATE.search(window)
+        following = []
+        for candidate in lines[index + 1 : index + 4]:
+            if (_LINK.match(candidate) or _BARE_LINK.match(candidate)
+                    or _BARE_MONTH.match(candidate)):
+                break
+            following.append(candidate)
+        window = " ".join(following)
+        own_date = _INLINE_DATE.search(title)
+        ahead = own_date or _INLINE_DATE.search(window)
         if ahead:
             name = (ahead.group(1) or ahead.group(4))[:3].lower()
             use_month, use_day = _MONTH_NUM[name], int(ahead.group(2) or ahead.group(3))
-            year_match = _YEAR.search(window)
+            year_match = _YEAR.search(title if own_date else window)
             use_year = int(year_match.group(1)) if year_match else _resolve_year(
                 use_month, use_day, today)
         elif month and day and age <= _DATE_TTL:
@@ -366,7 +375,7 @@ def extract(
 
         starts_at = None
         if use_month:
-            clock = _TIME.search(" ".join(lines[index : index + 4]))
+            clock = _TIME.search(f"{title} {window}")
             starts_at = f"{use_year:04d}-{use_month:02d}-{use_day:02d}"
             if clock:
                 hour = int(clock.group(1)) % 12 + (12 if clock.group(3).lower() == "p" else 0)

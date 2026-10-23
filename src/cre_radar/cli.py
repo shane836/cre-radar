@@ -1,6 +1,7 @@
 """The command surface. `cre-radar run` is the one a cron job calls."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
 
 import typer
@@ -32,6 +33,32 @@ def _echo_bad(message: str) -> None:
     typer.secho(message, fg=typer.colors.RED)
 
 
+def _stage(label: str, action: Callable[[], object]) -> bool:
+    """Run one stage of `run`, reporting a failure instead of raising it.
+
+    Each stage after this one reaches a different audience through a different
+    provider, so an exception escaping one silences deliveries that had nothing
+    to do with it. On 2026-09-17 Dropbox left the vault's parent unreadable,
+    `obsidian.write` raised, and that one folder cost Shane the daily email and
+    the list its Thursday issue.
+
+    Reported, never swallowed: `run` exits non-zero when any stage returns
+    False, and `scripts/daily.sh` logs that code.
+    """
+    try:
+        action()
+    except typer.Exit as exited:
+        # The stage already printed why; anything but 0 is still a failure.
+        if exited.exit_code == 0:
+            return True
+        _echo_bad(f"{label} failed (exit {exited.exit_code})")
+        return False
+    except Exception as error:  # noqa: BLE001 - a stage boundary catches everything
+        _echo_bad(f"{label} failed: {type(error).__name__}: {error}")
+        return False
+    return True
+
+
 def collect(
     only: list[str] = typer.Option(None, "--only", help="Limit to these source slugs."),
     force: bool = typer.Option(
@@ -44,13 +71,17 @@ def collect(
     are skipped. Use --force after changing extraction rules.
     """
     conn = db.connect()
+    failed = False
     for result in events.run(conn, only or None, force=force):
         if result.unchanged:
             typer.secho(f"{result.slug:<18} {result.summary}", fg=typer.colors.BLUE)
         elif result.ok:
             _echo_ok(f"{result.slug:<18} {result.summary}")
         else:
+            failed = True
             _echo_bad(f"{result.slug:<18} {result.error}")
+    if failed:
+        raise typer.Exit(1)
 
 
 app.command("collect")(collect)
@@ -102,17 +133,34 @@ def digest_cmd(
         )
         return
 
+    vault_failed = False
+    delivered = False
     if not no_obsidian:
-        _echo_ok(f"note written: {obsidian.write(note, day=day)}")
+        try:
+            _echo_ok(f"note written: {obsidian.write(note, day=day)}")
+            delivered = True
+        except (OSError, RuntimeError) as error:
+            # Dropbox can leave the vault's parent unreadable for a whole run,
+            # and an unset OBSIDIAN_DIGEST_DIR raises here too. Neither is a
+            # reason to skip the email — that is the delivery Shane actually
+            # reads, and it goes somewhere Dropbox cannot touch. The non-zero
+            # exit below still calls this a failed run.
+            _echo_bad(f"note not written: {type(error).__name__}: {error}")
+            vault_failed = True
 
     if not no_email:
         message_id = email_digest.send(render.html_email(pending, day=day), day=day)
         if message_id:
+            delivered = True
             _echo_ok(f"email sent: {message_id}")
         else:
             typer.secho("email skipped (Resend not configured)", fg=typer.colors.YELLOW)
 
-    db.mark_surfaced(conn, "events", [row["id"] for row in pending])
+    if delivered:
+        db.mark_surfaced(conn, "events", [row["id"] for row in pending])
+
+    if vault_failed:
+        raise typer.Exit(1)
 
 
 @app.command("newsletter")
@@ -343,15 +391,27 @@ def run_all(
     Fully unattended. No API key, no model, no network beyond fetching the
     sources themselves.
     """
-    collect(only=None, force=False)
+    collected = _stage("collect", lambda: collect(only=None, force=False))
     score_cmd()
+
+    # Every stage below is its own delivery to its own audience, so each runs
+    # whatever the one before it did. The order is still deliberate: the
+    # newsletter goes last so that a MailerLite outage cannot cost Shane the
+    # vault note and the daily email. The day gate inside it makes a daily call
+    # weekly.
+    ok = True
     if publish:
-        publish_cmd(deploy=True, prod=True)
-    digest_cmd(dry_run=False, no_email=no_email, no_obsidian=False)
-    # Last, and after the digest on purpose: a MailerLite outage must not cost
-    # Shane the vault note and the daily email. The day gate inside makes a
-    # daily call weekly.
-    newsletter_cmd(dry_run=False, force=False, no_report=no_email)
+        ok = _stage("publish", lambda: publish_cmd(deploy=True, prod=True))
+    digest_ok = _stage(
+        "digest",
+        lambda: digest_cmd(dry_run=False, no_email=no_email, no_obsidian=False),
+    )
+    issue_ok = _stage(
+        "newsletter",
+        lambda: newsletter_cmd(dry_run=False, force=False, no_report=no_email),
+    )
+    if not (collected and ok and digest_ok and issue_ok):
+        raise typer.Exit(1)
 
 
 @sources_app.command("list")

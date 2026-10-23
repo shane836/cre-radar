@@ -84,7 +84,7 @@ def subscribers(status: str = "active") -> list[dict]:
     MailerLite account and must not appear here.
     """
     group = mailerlite_group_id()
-    if not group:
+    if not group or not mailerlite_api_key():
         return []
 
     found: list[dict] = []

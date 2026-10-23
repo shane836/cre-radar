@@ -69,8 +69,10 @@ IREM, BOMA) score down hard, whatever the session is about.
 writing up the same panel collapse to one row, because the fingerprint comes from
 the event's own title, venue and local minute.
 
-**Unchanged calendars are skipped.** Each page's link set is fingerprinted; if it
-hasn't changed, nothing is re-extracted.
+**Unchanged calendars are skipped for up to a week.** Linked calendars use a URL
+fingerprint; plain-text calendars use their content. A weekly refresh catches
+date and venue changes at existing URLs. Zero extracted candidates are reported
+as failures and retried rather than cached as healthy calendars.
 
 ## The public page
 

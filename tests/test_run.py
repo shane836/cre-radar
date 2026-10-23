@@ -167,7 +167,9 @@ def test_rebuild_scores_successful_sources_even_when_collection_fails(tmp_path, 
     uv.chmod(0o755)
     monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
     monkeypatch.setenv("CRE_DB", str(tmp_path / "test.db"))
-    result = subprocess.run(["/bin/bash", str(script)], capture_output=True, text=True)
+    result = subprocess.run(
+        ["/bin/bash", str(script)], capture_output=True, text=True, check=False,
+    )
     assert (tmp_path / "calls").read_text().splitlines() == [
         "run cre-radar collect", "run cre-radar score",
     ]

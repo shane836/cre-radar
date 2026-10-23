@@ -32,8 +32,8 @@ verification_level = "official"
 [[source]]
 slug = "crew-la"
 org = "CREW Los Angeles"
-url = "https://crewla.org/events/"
-mode = "html"
+url = "https://crewla.org/events/view-all-events"
+mode = "browser"
 verification_level = "official"
 
 [[source]]

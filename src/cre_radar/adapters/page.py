@@ -6,6 +6,7 @@ costs nothing and behaves identically every time.
 """
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 
 from .. import heuristic
@@ -57,7 +58,11 @@ class PageAdapter:
 
         text, truncated = condense(html, self.source.url)
         self.page_text = text
-        self.page_fingerprint = link_fingerprint(text)
+        # Linkless cards change their titles/dates without changing any URLs.
+        self.page_fingerprint = (
+            hashlib.sha256(text.encode()).hexdigest()
+            if self.source.linkless else link_fingerprint(text)
+        )
         if self._known_fingerprint and self.page_fingerprint == self._known_fingerprint:
             return FetchResult(fetched_at=now, unchanged=True)
 
@@ -65,6 +70,12 @@ class PageAdapter:
             text, org=self.source.org,
             linkless=self.source.linkless, page_url=self.source.url,
         )
+        if not extracted:
+            return FetchResult(errors=[SourceError(
+                stage="parse", message="No event candidates extracted; check the calendar URL, "
+                "page rendering, or source availability",
+                retryable=True, source=self.id, occurred_at=now,
+            )], fetched_at=now)
 
         events, errors = [], []
         for item in extracted:
