@@ -86,3 +86,32 @@ def test_first_run_persists_what_it_extracted(conn, spy):
 
     assert result.found == 1
     assert result.inserted == 1
+
+
+def test_d6_linkless_title_changes_invalidate_cache(conn, spy, monkeypatch):
+    source = Source(slug="test", org="Test Org", url=SOURCE.url, linkless=True)
+    events.harvest(conn, source)
+    monkeypatch.setattr("cre_radar.adapters.page.fetch_static", lambda url:
+                        PAGE.replace("Capital Markets Forum", "Storage Investment Forum"))
+    assert events.harvest(conn, source).unchanged is False
+    assert len(spy) == 2
+
+
+def test_d7_detail_only_changes_are_refreshed_weekly(conn, spy):
+    events.harvest(conn, SOURCE)
+    conn.execute("UPDATE source_state SET extracted_at = datetime('now', '-8 days')")
+    conn.commit()
+    assert events.harvest(conn, SOURCE).unchanged is False
+    assert len(spy) == 2
+
+
+@pytest.mark.parametrize("html", [
+    "<body>Just a moment... Performing security verification</body>",
+    "<body><h1>Upcoming events</h1><p>No listings available</p></body>",
+])
+def test_d8_empty_extraction_is_reported_and_not_cached(conn, monkeypatch, html):
+    monkeypatch.setattr("cre_radar.adapters.page.fetch_static", lambda url: html)
+    result = events.harvest(conn, SOURCE)
+    assert result.ok is False
+    assert result.errors[0].stage == "parse"
+    assert db_mod.last_page_hash(conn, SOURCE.slug) is None

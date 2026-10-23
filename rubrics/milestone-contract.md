@@ -58,6 +58,18 @@ dimension below is a hypothesis that one specific thing can go wrong.
 | D3 | A new event is missed by the cache | Add one link | Re-extracts |
 | D4 | `--force` doesn't force | Harvest, then harvest with `force=True` | 2 calls |
 | D5 | Failed extraction poisons the cache | Extraction raises, then succeeds | Second run re-extracts (no stored hash) |
+| D6 | Linkless calendars miss new titles behind unchanged links | Change a plain-text event title | Re-extracts |
+| D7 | Detail-only updates stay cached forever | Age the saved hash by eight days | Re-extracts |
+| D8 | Empty or blocked pages become successful cached calendars | Return no candidates or a challenge page | Reports a parse error, no saved hash |
+
+## F. Collection recovery
+
+| # | Failure mode | Check | Pass |
+|---|---|---|---|
+| F1 | Featured event year leaks into later date blocks | Featured 2027 conference before November cards | November resolves to 2026 |
+| F2 | A linked card takes the next card's date | Adjacent links contain their own dates | Each uses its own date |
+| F3 | Failed collection hides errors or prevents other deliveries | Fail one source in the daily run | Other stages run; command exits nonzero |
+| F4 | Failed vault delivery consumes undelivered rows | Vault fails and email is disabled or unconfigured | Rows remain pending |
 
 ## E. Build / lint / tests
 

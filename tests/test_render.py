@@ -23,7 +23,7 @@ def _pending():
     for row in db.unscored(conn, "events"):
         db.apply_verdict(conn, "events", row["id"],
                          Verdict(score=80, reason="Worth it.", topics=["self storage"]))
-    return db.pending_events(conn, 55)
+    return conn.execute("SELECT * FROM events ORDER BY starts_at IS NULL, starts_at").fetchall()
 
 
 def test_times_render_in_local_not_utc():
@@ -84,7 +84,8 @@ def test_venue_is_not_repeated_as_city():
     for row in db.unscored(conn, "events"):
         db.apply_verdict(conn, "events", row["id"], Verdict(score=80, reason="r"))
 
-    note = render.markdown(db.pending_events(conn, 55), day=date(2026, 8, 26))
+    rows = conn.execute("SELECT * FROM events").fetchall()
+    note = render.markdown(rows, day=date(2026, 8, 26))
     assert "Online, Online" not in note
     assert "Online" in note
 

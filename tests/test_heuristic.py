@@ -114,3 +114,25 @@ def test_unlinked_card_without_a_title_is_skipped():
     """An image link with nothing usable beneath it is not an event."""
     text = "[](https://x.test/card)\nIn Person\n[](https://x.test/next)"
     assert extract(text, today=TODAY) == []
+
+
+def test_featured_year_does_not_leak_into_later_date_blocks():
+    text = (
+        "[Napa Conference 2027](https://x.test/events/napa)\nMay 17 - May 18, 2027\n"
+        "Nov\n10\n[Women in Storage Networking](https://x.test/events/networking)\n"
+        "10:00 AM - 11:30 AM\nDec\n10\n"
+        "[2026 LA Holiday Happy Hour](https://x.test/events/holiday)\n4:00 PM"
+    )
+    found = extract(text, today=date(2026, 10, 23))
+    assert by_title(found, "Women in Storage").starts_at == "2026-11-10T10:00"
+    assert by_title(found, "LA Holiday").starts_at == "2026-12-10T16:00"
+
+
+def test_linked_cards_use_their_own_inline_date():
+    text = (
+        "[Holiday Party December 1, 2026 5:00 PM](https://x.test/events/holiday)\n"
+        "[Post-Election Analysis November 19, 2026 11:45 AM](https://x.test/events/panel)"
+    )
+    found = extract(text, today=date(2026, 10, 23))
+    assert by_title(found, "Holiday").starts_at == "2026-12-01T17:00"
+    assert by_title(found, "Analysis").starts_at == "2026-11-19T11:45"

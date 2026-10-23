@@ -3,6 +3,7 @@ corrupt the digest."""
 from __future__ import annotations
 
 import pytest
+from datetime import UTC, datetime, timedelta
 
 from cre_radar import db
 from cre_radar.models import Verdict
@@ -26,8 +27,9 @@ def test_normalize_url_collapses_cosmetic_variation(raw, expected):
 
 
 def test_pending_excludes_low_scores_and_already_surfaced(conn):
-    persist_event(conn, make_event(source="a", level="official", title="Keep"))
-    persist_event(conn, make_event(source="b", level="official", title="Drop"))
+    future = datetime.now(UTC) + timedelta(days=3)
+    persist_event(conn, make_event(source="a", level="official", title="Keep", when=future))
+    persist_event(conn, make_event(source="b", level="official", title="Drop", when=future))
     rows = conn.execute("SELECT id, title FROM events ORDER BY id").fetchall()
     for row in rows:
         db.apply_verdict(conn, "events", row["id"],
