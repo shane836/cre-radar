@@ -2,8 +2,9 @@
 corrupt the digest."""
 from __future__ import annotations
 
-import pytest
 from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from cre_radar import db
 from cre_radar.models import Verdict

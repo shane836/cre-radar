@@ -151,3 +151,24 @@ def test_collection_failure_still_runs_deliveries(calls, monkeypatch):
     with pytest.raises(typer.Exit):
         cli.run_all(no_email=False, publish=True)
     assert calls == ["score", "publish", "digest", "newsletter"]
+
+
+def test_rebuild_scores_successful_sources_even_when_collection_fails(tmp_path, monkeypatch):
+    import subprocess
+    from pathlib import Path
+
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    original = Path(__file__).resolve().parents[1] / "scripts" / "rebuild.sh"
+    script = scripts / "rebuild.sh"
+    script.write_text(original.read_text())
+    uv = tmp_path / "uv"
+    uv.write_text('#!/bin/sh\necho "$*" >> calls\n[ "$3" != "collect" ]\n')
+    uv.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    monkeypatch.setenv("CRE_DB", str(tmp_path / "test.db"))
+    result = subprocess.run(["/bin/bash", str(script)], capture_output=True, text=True)
+    assert (tmp_path / "calls").read_text().splitlines() == [
+        "run cre-radar collect", "run cre-radar score",
+    ]
+    assert result.returncode == 1
